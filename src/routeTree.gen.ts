@@ -9,38 +9,232 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedStockRouteImport } from './routes/_authenticated/stock'
+import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
+import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenticated/restaurants'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
+import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales.new'
+import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
+import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases.new'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedStockRoute = AuthenticatedStockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSalesRoute = AuthenticatedSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRestaurantsRoute =
+  AuthenticatedRestaurantsRouteImport.update({
+    id: '/restaurants',
+    path: '/restaurants',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPurchasesRoute = AuthenticatedPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSalesNewRoute = AuthenticatedSalesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthenticatedSalesRoute,
+} as any)
+const AuthenticatedRestaurantsIdRoute =
+  AuthenticatedRestaurantsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedRestaurantsRoute,
+  } as any)
+const AuthenticatedPurchasesNewRoute =
+  AuthenticatedPurchasesNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedPurchasesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/categories': typeof AuthenticatedCategoriesRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/products': typeof AuthenticatedProductsRoute
+  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/reports': typeof AuthenticatedReportsRoute
+  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/stock': typeof AuthenticatedStockRoute
+  '/purchases/new': typeof AuthenticatedPurchasesNewRoute
+  '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/categories': typeof AuthenticatedCategoriesRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/products': typeof AuthenticatedProductsRoute
+  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/reports': typeof AuthenticatedReportsRoute
+  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/stock': typeof AuthenticatedStockRoute
+  '/purchases/new': typeof AuthenticatedPurchasesNewRoute
+  '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_authenticated/categories': typeof AuthenticatedCategoriesRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/products': typeof AuthenticatedProductsRoute
+  '/_authenticated/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/_authenticated/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/_authenticated/stock': typeof AuthenticatedStockRoute
+  '/_authenticated/purchases/new': typeof AuthenticatedPurchasesNewRoute
+  '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/_authenticated/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/sitemap.xml'
+    | '/categories'
+    | '/dashboard'
+    | '/products'
+    | '/purchases'
+    | '/reports'
+    | '/restaurants'
+    | '/sales'
+    | '/stock'
+    | '/purchases/new'
+    | '/restaurants/$id'
+    | '/sales/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/sitemap.xml'
+    | '/categories'
+    | '/dashboard'
+    | '/products'
+    | '/purchases'
+    | '/reports'
+    | '/restaurants'
+    | '/sales'
+    | '/stock'
+    | '/purchases/new'
+    | '/restaurants/$id'
+    | '/sales/new'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/sitemap.xml'
+    | '/_authenticated/categories'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/products'
+    | '/_authenticated/purchases'
+    | '/_authenticated/reports'
+    | '/_authenticated/restaurants'
+    | '/_authenticated/sales'
+    | '/_authenticated/stock'
+    | '/_authenticated/purchases/new'
+    | '/_authenticated/restaurants/$id'
+    | '/_authenticated/sales/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +242,156 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/stock': {
+      id: '/_authenticated/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof AuthenticatedStockRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sales': {
+      id: '/_authenticated/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof AuthenticatedSalesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/restaurants': {
+      id: '/_authenticated/restaurants'
+      path: '/restaurants'
+      fullPath: '/restaurants'
+      preLoaderRoute: typeof AuthenticatedRestaurantsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/purchases': {
+      id: '/_authenticated/purchases'
+      path: '/purchases'
+      fullPath: '/purchases'
+      preLoaderRoute: typeof AuthenticatedPurchasesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/products': {
+      id: '/_authenticated/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AuthenticatedProductsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/categories': {
+      id: '/_authenticated/categories'
+      path: '/categories'
+      fullPath: '/categories'
+      preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sales/new': {
+      id: '/_authenticated/sales/new'
+      path: '/new'
+      fullPath: '/sales/new'
+      preLoaderRoute: typeof AuthenticatedSalesNewRouteImport
+      parentRoute: typeof AuthenticatedSalesRoute
+    }
+    '/_authenticated/restaurants/$id': {
+      id: '/_authenticated/restaurants/$id'
+      path: '/$id'
+      fullPath: '/restaurants/$id'
+      preLoaderRoute: typeof AuthenticatedRestaurantsIdRouteImport
+      parentRoute: typeof AuthenticatedRestaurantsRoute
+    }
+    '/_authenticated/purchases/new': {
+      id: '/_authenticated/purchases/new'
+      path: '/new'
+      fullPath: '/purchases/new'
+      preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
+      parentRoute: typeof AuthenticatedPurchasesRoute
+    }
   }
 }
 
+interface AuthenticatedPurchasesRouteChildren {
+  AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
+}
+
+const AuthenticatedPurchasesRouteChildren: AuthenticatedPurchasesRouteChildren =
+  {
+    AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
+  }
+
+const AuthenticatedPurchasesRouteWithChildren =
+  AuthenticatedPurchasesRoute._addFileChildren(
+    AuthenticatedPurchasesRouteChildren,
+  )
+
+interface AuthenticatedRestaurantsRouteChildren {
+  AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
+}
+
+const AuthenticatedRestaurantsRouteChildren: AuthenticatedRestaurantsRouteChildren =
+  {
+    AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
+  }
+
+const AuthenticatedRestaurantsRouteWithChildren =
+  AuthenticatedRestaurantsRoute._addFileChildren(
+    AuthenticatedRestaurantsRouteChildren,
+  )
+
+interface AuthenticatedSalesRouteChildren {
+  AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
+}
+
+const AuthenticatedSalesRouteChildren: AuthenticatedSalesRouteChildren = {
+  AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
+}
+
+const AuthenticatedSalesRouteWithChildren =
+  AuthenticatedSalesRoute._addFileChildren(AuthenticatedSalesRouteChildren)
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
+  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRouteWithChildren
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
+  AuthenticatedSalesRoute: typeof AuthenticatedSalesRouteWithChildren
+  AuthenticatedStockRoute: typeof AuthenticatedStockRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedCategoriesRoute: AuthenticatedCategoriesRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedProductsRoute: AuthenticatedProductsRoute,
+  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRouteWithChildren,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
+  AuthenticatedSalesRoute: AuthenticatedSalesRouteWithChildren,
+  AuthenticatedStockRoute: AuthenticatedStockRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
