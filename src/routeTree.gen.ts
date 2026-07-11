@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedStockRouteImport } from './routes/_authenticated/stock'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
 import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenticated/restaurants'
 import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
@@ -34,6 +35,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStockRoute = AuthenticatedStockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSalesRoute = AuthenticatedSalesRouteImport.update({
   id: '/sales',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/stock': typeof AuthenticatedStockRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/stock': typeof AuthenticatedStockRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/_authenticated/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/_authenticated/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/_authenticated/stock': typeof AuthenticatedStockRoute
   '/_authenticated/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/_authenticated/sales/new': typeof AuthenticatedSalesNewRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/purchases'
     | '/restaurants'
     | '/sales'
+    | '/stock'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/purchases'
     | '/restaurants'
     | '/sales'
+    | '/stock'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/_authenticated/purchases'
     | '/_authenticated/restaurants'
     | '/_authenticated/sales'
+    | '/_authenticated/stock'
     | '/_authenticated/purchases/new'
     | '/_authenticated/restaurants/$id'
     | '/_authenticated/sales/new'
@@ -185,6 +197,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/stock': {
+      id: '/_authenticated/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof AuthenticatedStockRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/sales': {
       id: '/_authenticated/sales'
@@ -290,6 +309,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRouteWithChildren
   AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRouteWithChildren
+  AuthenticatedStockRoute: typeof AuthenticatedStockRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -298,6 +318,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPurchasesRoute: AuthenticatedPurchasesRouteWithChildren,
   AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
   AuthenticatedSalesRoute: AuthenticatedSalesRouteWithChildren,
+  AuthenticatedStockRoute: AuthenticatedStockRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
