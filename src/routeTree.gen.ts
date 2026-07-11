@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenticated/restaurants'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
+import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -46,20 +47,28 @@ const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRestaurantsIdRoute =
+  AuthenticatedRestaurantsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedRestaurantsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,13 +77,26 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/categories': typeof AuthenticatedCategoriesRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
-  '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/categories' | '/products' | '/restaurants'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/categories'
+    | '/products'
+    | '/restaurants'
+    | '/restaurants/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/categories' | '/products' | '/restaurants'
+  to:
+    | '/'
+    | '/auth'
+    | '/categories'
+    | '/products'
+    | '/restaurants'
+    | '/restaurants/$id'
   id:
     | '__root__'
     | '/'
@@ -83,6 +105,7 @@ export interface FileRouteTypes {
     | '/_authenticated/categories'
     | '/_authenticated/products'
     | '/_authenticated/restaurants'
+    | '/_authenticated/restaurants/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -135,19 +158,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/restaurants/$id': {
+      id: '/_authenticated/restaurants/$id'
+      path: '/$id'
+      fullPath: '/restaurants/$id'
+      preLoaderRoute: typeof AuthenticatedRestaurantsIdRouteImport
+      parentRoute: typeof AuthenticatedRestaurantsRoute
+    }
   }
 }
+
+interface AuthenticatedRestaurantsRouteChildren {
+  AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
+}
+
+const AuthenticatedRestaurantsRouteChildren: AuthenticatedRestaurantsRouteChildren =
+  {
+    AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
+  }
+
+const AuthenticatedRestaurantsRouteWithChildren =
+  AuthenticatedRestaurantsRoute._addFileChildren(
+    AuthenticatedRestaurantsRouteChildren,
+  )
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
-  AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRoute
+  AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCategoriesRoute: AuthenticatedCategoriesRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
-  AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRoute,
+  AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
 }
 
 const AuthenticatedRouteRouteWithChildren =
