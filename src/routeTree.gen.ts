@@ -17,6 +17,7 @@ import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
+import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases.new'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -59,14 +60,21 @@ const AuthenticatedRestaurantsIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedRestaurantsRoute,
   } as any)
+const AuthenticatedPurchasesNewRoute =
+  AuthenticatedPurchasesNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedPurchasesRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/purchases': typeof AuthenticatedPurchasesRoute
+  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRoutesByTo {
@@ -74,8 +82,9 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/purchases': typeof AuthenticatedPurchasesRoute
+  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRoutesById {
@@ -85,8 +94,9 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/categories': typeof AuthenticatedCategoriesRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
-  '/_authenticated/purchases': typeof AuthenticatedPurchasesRoute
+  '/_authenticated/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
+  '/_authenticated/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
 export interface FileRouteTypes {
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/purchases'
     | '/restaurants'
+    | '/purchases/new'
     | '/restaurants/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/purchases'
     | '/restaurants'
+    | '/purchases/new'
     | '/restaurants/$id'
   id:
     | '__root__'
@@ -117,6 +129,7 @@ export interface FileRouteTypes {
     | '/_authenticated/products'
     | '/_authenticated/purchases'
     | '/_authenticated/restaurants'
+    | '/_authenticated/purchases/new'
     | '/_authenticated/restaurants/$id'
   fileRoutesById: FileRoutesById
 }
@@ -184,8 +197,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRestaurantsIdRouteImport
       parentRoute: typeof AuthenticatedRestaurantsRoute
     }
+    '/_authenticated/purchases/new': {
+      id: '/_authenticated/purchases/new'
+      path: '/new'
+      fullPath: '/purchases/new'
+      preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
+      parentRoute: typeof AuthenticatedPurchasesRoute
+    }
   }
 }
+
+interface AuthenticatedPurchasesRouteChildren {
+  AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
+}
+
+const AuthenticatedPurchasesRouteChildren: AuthenticatedPurchasesRouteChildren =
+  {
+    AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
+  }
+
+const AuthenticatedPurchasesRouteWithChildren =
+  AuthenticatedPurchasesRoute._addFileChildren(
+    AuthenticatedPurchasesRouteChildren,
+  )
 
 interface AuthenticatedRestaurantsRouteChildren {
   AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
@@ -204,14 +238,14 @@ const AuthenticatedRestaurantsRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
-  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRoute
+  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRouteWithChildren
   AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCategoriesRoute: AuthenticatedCategoriesRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
-  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRoute,
+  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRouteWithChildren,
   AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
 }
 
