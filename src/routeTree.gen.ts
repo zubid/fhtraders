@@ -17,6 +17,7 @@ import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
+import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
 import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases.new'
 
@@ -60,6 +61,11 @@ const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSalesNewRoute = AuthenticatedSalesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthenticatedSalesRoute,
+} as any)
 const AuthenticatedRestaurantsIdRoute =
   AuthenticatedRestaurantsIdRouteImport.update({
     id: '/$id',
@@ -80,9 +86,10 @@ export interface FileRoutesByFullPath {
   '/products': typeof AuthenticatedProductsRoute
   '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/sales': typeof AuthenticatedSalesRoute
+  '/sales': typeof AuthenticatedSalesRouteWithChildren
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,9 +98,10 @@ export interface FileRoutesByTo {
   '/products': typeof AuthenticatedProductsRoute
   '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/sales': typeof AuthenticatedSalesRoute
+  '/sales': typeof AuthenticatedSalesRouteWithChildren
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,9 +112,10 @@ export interface FileRoutesById {
   '/_authenticated/products': typeof AuthenticatedProductsRoute
   '/_authenticated/purchases': typeof AuthenticatedPurchasesRouteWithChildren
   '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/_authenticated/sales': typeof AuthenticatedSalesRoute
+  '/_authenticated/sales': typeof AuthenticatedSalesRouteWithChildren
   '/_authenticated/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/_authenticated/sales/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/purchases/new'
     | '/restaurants/$id'
+    | '/sales/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/sales'
     | '/purchases/new'
     | '/restaurants/$id'
+    | '/sales/new'
   id:
     | '__root__'
     | '/'
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/purchases/new'
     | '/_authenticated/restaurants/$id'
+    | '/_authenticated/sales/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -209,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sales/new': {
+      id: '/_authenticated/sales/new'
+      path: '/new'
+      fullPath: '/sales/new'
+      preLoaderRoute: typeof AuthenticatedSalesNewRouteImport
+      parentRoute: typeof AuthenticatedSalesRoute
+    }
     '/_authenticated/restaurants/$id': {
       id: '/_authenticated/restaurants/$id'
       path: '/$id'
@@ -254,12 +273,23 @@ const AuthenticatedRestaurantsRouteWithChildren =
     AuthenticatedRestaurantsRouteChildren,
   )
 
+interface AuthenticatedSalesRouteChildren {
+  AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
+}
+
+const AuthenticatedSalesRouteChildren: AuthenticatedSalesRouteChildren = {
+  AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
+}
+
+const AuthenticatedSalesRouteWithChildren =
+  AuthenticatedSalesRoute._addFileChildren(AuthenticatedSalesRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
   AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRouteWithChildren
   AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
-  AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
+  AuthenticatedSalesRoute: typeof AuthenticatedSalesRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -267,7 +297,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
   AuthenticatedPurchasesRoute: AuthenticatedPurchasesRouteWithChildren,
   AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
-  AuthenticatedSalesRoute: AuthenticatedSalesRoute,
+  AuthenticatedSalesRoute: AuthenticatedSalesRouteWithChildren,
 }
 
 const AuthenticatedRouteRouteWithChildren =
