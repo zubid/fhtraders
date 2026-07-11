@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenticated/restaurants'
+import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
@@ -37,6 +38,11 @@ const AuthenticatedRestaurantsRoute =
     path: '/restaurants',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPurchasesRoute = AuthenticatedPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
+  '/purchases': typeof AuthenticatedPurchasesRoute
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/products': typeof AuthenticatedProductsRoute
+  '/purchases': typeof AuthenticatedPurchasesRoute
   '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/categories': typeof AuthenticatedCategoriesRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
+  '/_authenticated/purchases': typeof AuthenticatedPurchasesRoute
   '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
   '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
 }
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/categories'
     | '/products'
+    | '/purchases'
     | '/restaurants'
     | '/restaurants/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/categories'
     | '/products'
+    | '/purchases'
     | '/restaurants'
     | '/restaurants/$id'
   id:
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/categories'
     | '/_authenticated/products'
+    | '/_authenticated/purchases'
     | '/_authenticated/restaurants'
     | '/_authenticated/restaurants/$id'
   fileRoutesById: FileRoutesById
@@ -142,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/restaurants'
       fullPath: '/restaurants'
       preLoaderRoute: typeof AuthenticatedRestaurantsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/purchases': {
+      id: '/_authenticated/purchases'
+      path: '/purchases'
+      fullPath: '/purchases'
+      preLoaderRoute: typeof AuthenticatedPurchasesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/products': {
@@ -185,12 +204,14 @@ const AuthenticatedRestaurantsRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
+  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRoute
   AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCategoriesRoute: AuthenticatedCategoriesRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
+  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRoute,
   AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
 }
 
