@@ -19,11 +19,12 @@ import { Route as AuthenticatedRestaurantsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPurchasesRouteImport } from './routes/_authenticated/purchases'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
-import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales.new'
-import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants.$id'
-import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases.new'
+import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
+import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
+import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases_.new'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -75,6 +76,11 @@ const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -86,21 +92,21 @@ const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSalesNewRoute = AuthenticatedSalesNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AuthenticatedSalesRoute,
+  id: '/sales_/new',
+  path: '/sales/new',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedRestaurantsIdRoute =
   AuthenticatedRestaurantsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => AuthenticatedRestaurantsRoute,
+    id: '/restaurants_/$id',
+    path: '/restaurants/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPurchasesNewRoute =
   AuthenticatedPurchasesNewRouteImport.update({
-    id: '/new',
-    path: '/new',
-    getParentRoute: () => AuthenticatedPurchasesRoute,
+    id: '/purchases_/new',
+    path: '/purchases/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -109,11 +115,12 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/purchases': typeof AuthenticatedPurchasesRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/sales': typeof AuthenticatedSalesRoute
   '/stock': typeof AuthenticatedStockRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
@@ -125,11 +132,12 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/categories': typeof AuthenticatedCategoriesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/products': typeof AuthenticatedProductsRoute
-  '/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/purchases': typeof AuthenticatedPurchasesRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/sales': typeof AuthenticatedSalesRoute
   '/stock': typeof AuthenticatedStockRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
@@ -143,15 +151,16 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/categories': typeof AuthenticatedCategoriesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/products': typeof AuthenticatedProductsRoute
-  '/_authenticated/purchases': typeof AuthenticatedPurchasesRouteWithChildren
+  '/_authenticated/purchases': typeof AuthenticatedPurchasesRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
-  '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRouteWithChildren
-  '/_authenticated/sales': typeof AuthenticatedSalesRouteWithChildren
+  '/_authenticated/restaurants': typeof AuthenticatedRestaurantsRoute
+  '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/stock': typeof AuthenticatedStockRoute
-  '/_authenticated/purchases/new': typeof AuthenticatedPurchasesNewRoute
-  '/_authenticated/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
-  '/_authenticated/sales/new': typeof AuthenticatedSalesNewRoute
+  '/_authenticated/purchases_/new': typeof AuthenticatedPurchasesNewRoute
+  '/_authenticated/restaurants_/$id': typeof AuthenticatedRestaurantsIdRoute
+  '/_authenticated/sales_/new': typeof AuthenticatedSalesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/categories'
     | '/dashboard'
+    | '/payments'
     | '/products'
     | '/purchases'
     | '/reports'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/categories'
     | '/dashboard'
+    | '/payments'
     | '/products'
     | '/purchases'
     | '/reports'
@@ -194,15 +205,16 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_authenticated/categories'
     | '/_authenticated/dashboard'
+    | '/_authenticated/payments'
     | '/_authenticated/products'
     | '/_authenticated/purchases'
     | '/_authenticated/reports'
     | '/_authenticated/restaurants'
     | '/_authenticated/sales'
     | '/_authenticated/stock'
-    | '/_authenticated/purchases/new'
-    | '/_authenticated/restaurants/$id'
-    | '/_authenticated/sales/new'
+    | '/_authenticated/purchases_/new'
+    | '/_authenticated/restaurants_/$id'
+    | '/_authenticated/sales_/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -284,6 +296,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/payments': {
+      id: '/_authenticated/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -298,89 +317,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/sales/new': {
-      id: '/_authenticated/sales/new'
-      path: '/new'
+    '/_authenticated/sales_/new': {
+      id: '/_authenticated/sales_/new'
+      path: '/sales/new'
       fullPath: '/sales/new'
       preLoaderRoute: typeof AuthenticatedSalesNewRouteImport
-      parentRoute: typeof AuthenticatedSalesRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/restaurants/$id': {
-      id: '/_authenticated/restaurants/$id'
-      path: '/$id'
+    '/_authenticated/restaurants_/$id': {
+      id: '/_authenticated/restaurants_/$id'
+      path: '/restaurants/$id'
       fullPath: '/restaurants/$id'
       preLoaderRoute: typeof AuthenticatedRestaurantsIdRouteImport
-      parentRoute: typeof AuthenticatedRestaurantsRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/purchases/new': {
-      id: '/_authenticated/purchases/new'
-      path: '/new'
+    '/_authenticated/purchases_/new': {
+      id: '/_authenticated/purchases_/new'
+      path: '/purchases/new'
       fullPath: '/purchases/new'
       preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
-      parentRoute: typeof AuthenticatedPurchasesRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
-
-interface AuthenticatedPurchasesRouteChildren {
-  AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
-}
-
-const AuthenticatedPurchasesRouteChildren: AuthenticatedPurchasesRouteChildren =
-  {
-    AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
-  }
-
-const AuthenticatedPurchasesRouteWithChildren =
-  AuthenticatedPurchasesRoute._addFileChildren(
-    AuthenticatedPurchasesRouteChildren,
-  )
-
-interface AuthenticatedRestaurantsRouteChildren {
-  AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
-}
-
-const AuthenticatedRestaurantsRouteChildren: AuthenticatedRestaurantsRouteChildren =
-  {
-    AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
-  }
-
-const AuthenticatedRestaurantsRouteWithChildren =
-  AuthenticatedRestaurantsRoute._addFileChildren(
-    AuthenticatedRestaurantsRouteChildren,
-  )
-
-interface AuthenticatedSalesRouteChildren {
-  AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
-}
-
-const AuthenticatedSalesRouteChildren: AuthenticatedSalesRouteChildren = {
-  AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
-}
-
-const AuthenticatedSalesRouteWithChildren =
-  AuthenticatedSalesRoute._addFileChildren(AuthenticatedSalesRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCategoriesRoute: typeof AuthenticatedCategoriesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRoute
-  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRouteWithChildren
+  AuthenticatedPurchasesRoute: typeof AuthenticatedPurchasesRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
-  AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRouteWithChildren
-  AuthenticatedSalesRoute: typeof AuthenticatedSalesRouteWithChildren
+  AuthenticatedRestaurantsRoute: typeof AuthenticatedRestaurantsRoute
+  AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedStockRoute: typeof AuthenticatedStockRoute
+  AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
+  AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
+  AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCategoriesRoute: AuthenticatedCategoriesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRoute,
-  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRouteWithChildren,
+  AuthenticatedPurchasesRoute: AuthenticatedPurchasesRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
-  AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRouteWithChildren,
-  AuthenticatedSalesRoute: AuthenticatedSalesRouteWithChildren,
+  AuthenticatedRestaurantsRoute: AuthenticatedRestaurantsRoute,
+  AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedStockRoute: AuthenticatedStockRoute,
+  AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
+  AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
+  AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

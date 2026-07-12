@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/sales/new")({
+export const Route = createFileRoute("/_authenticated/sales_/new")({
   component: NewSale,
 });
 
@@ -27,6 +27,7 @@ function NewSale() {
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
+  const [received, setReceived] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [term, setTerm] = useState("");
 
@@ -71,7 +72,7 @@ function NewSale() {
       if (hasOverstock) throw new Error("One or more items exceed available stock");
       const { data: sale, error: sErr } = await supabase
         .from("sales")
-        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, notes: notes || null })
+        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, amount_received: Math.min(received, grandTotal), notes: notes || null })
         .select("id").single();
       if (sErr) throw sErr;
       const items = lines.map((l) => ({
@@ -158,11 +159,18 @@ function NewSale() {
               <div className="space-y-2"><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(+e.target.value)} /></div>
             </div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+            <div className="space-y-2">
+              <Label>Amount Received (optional)</Label>
+              <Input type="number" min="0" step="0.01" value={received} onChange={(e) => setReceived(+e.target.value)} />
+              <p className="text-xs text-muted-foreground">Leave 0 to record the full amount as credit.</p>
+            </div>
             <div className="space-y-1 border-t border-border pt-4 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
               <div className="flex justify-between"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>
               <div className="flex justify-between"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
               <div className="flex justify-between text-lg font-bold"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
+              <div className="flex justify-between text-success"><span>Received</span><span>{formatCurrency(Math.min(received, grandTotal))}</span></div>
+              <div className="flex justify-between font-semibold text-destructive"><span>Balance (credit)</span><span>{formatCurrency(Math.max(0, grandTotal - received))}</span></div>
             </div>
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || hasOverstock}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Sale
