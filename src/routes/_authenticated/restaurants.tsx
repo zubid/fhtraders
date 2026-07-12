@@ -6,6 +6,8 @@ import { Plus, Pencil, Trash2, Search, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
+import { saleBalance } from "@/lib/credit";
+import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +35,7 @@ const emptyForm = { name: "", contact_person: "", phone: "", address: "", email:
 function RestaurantsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [onlyOutstanding, setOnlyOutstanding] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Restaurant | null>(null);
   const [toDelete, setToDelete] = useState<Restaurant | null>(null);
@@ -47,9 +50,28 @@ function RestaurantsPage() {
     },
   });
 
+  const { data: sales } = useQuery({
+    queryKey: ["sales-balances"],
+    queryFn: async () =>
+      (await supabase.from("sales").select("restaurant_id,grand_total,amount_received")).data ?? [],
+  });
+
+  const balances = useMemo(() => {
+    const map = new Map<string, number>();
+    (sales ?? []).forEach((s: any) => {
+      if (!s.restaurant_id) return;
+      map.set(s.restaurant_id, (map.get(s.restaurant_id) ?? 0) + saleBalance(s));
+    });
+    return map;
+  }, [sales]);
+
   const filtered = useMemo(
-    () => (data ?? []).filter((r) => r.name.toLowerCase().includes(search.toLowerCase())),
-    [data, search],
+    () =>
+      (data ?? [])
+        .filter((r) => r.name.toLowerCase().includes(search.toLowerCase()))
+        .filter((r) => (onlyOutstanding ? (balances.get(r.id) ?? 0) > 0.001 : true))
+        .sort((a, b) => (balances.get(b.id) ?? 0) - (balances.get(a.id) ?? 0)),
+    [data, search, onlyOutstanding, balances],
   );
 
   const save = useMutation({
@@ -103,9 +125,14 @@ function RestaurantsPage() {
         actions={<Button onClick={openNew}><Plus className="mr-1 h-4 w-4" />New Restaurant</Button>}
       />
       <Card className="p-4">
-        <div className="relative mb-4 max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search restaurants..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search restaurants..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <Button variant={onlyOutstanding ? "default" : "outline"} size="sm" onClick={() => setOnlyOutstanding((v) => !v)}>
+            Outstanding only
+          </Button>
         </div>
         {isLoading ? (
           <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
@@ -120,6 +147,7 @@ function RestaurantsPage() {
                   <TableHead>Contact</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Terms</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -133,6 +161,11 @@ function RestaurantsPage() {
                     <TableCell>{r.contact_person || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{r.phone || "-"}</TableCell>
                     <TableCell>{r.credit_terms || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {(balances.get(r.id) ?? 0) > 0.001
+                        ? <Badge className="bg-destructive/15 text-destructive border border-destructive/30">{formatCurrency(balances.get(r.id) ?? 0)}</Badge>
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
                     <TableCell>
                       {r.is_active
                         ? <Badge className="bg-success/15 text-success border border-success/30">Active</Badge>

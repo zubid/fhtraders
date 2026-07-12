@@ -45,6 +45,9 @@ export function printInvoice(sale: any) {
       <div><span>Discount</span><span>-${formatCurrency(sale.discount)}</span></div>
       <div><span>Tax</span><span>${formatCurrency(sale.tax)}</span></div>
       <div class="grand"><span>Total</span><span>${formatCurrency(sale.grand_total)}</span></div>
+      <div><span>Amount Received</span><span>${formatCurrency(sale.amount_received)}</span></div>
+      <div style="font-weight:700"><span>Balance Due</span><span>${formatCurrency(Math.max(0, Number(sale.grand_total ?? 0) - Number(sale.amount_received ?? 0)))}</span></div>
+      <div class="muted" style="text-align:right;margin-top:4px">Status: ${(sale.payment_status ?? "unpaid").toUpperCase()}</div>
     </div>
     <p class="muted" style="margin-top:40px;text-align:center">Thank you for your business.</p>
   </body></html>`;

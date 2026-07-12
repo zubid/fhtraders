@@ -10,6 +10,7 @@ import {
   BarChart3,
   LogOut,
   Warehouse,
+  HandCoins,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Purchases", url: "/purchases", icon: ShoppingCart },
   { title: "Sales", url: "/sales", icon: Receipt },
+  { title: "Payments", url: "/payments", icon: HandCoins },
   { title: "Stock", url: "/stock", icon: Boxes },
 ];
 

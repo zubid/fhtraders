@@ -47,6 +47,60 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          method: string
+          note: string | null
+          payment_date: string
+          restaurant_id: string
+          sale_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string
+          note?: string | null
+          payment_date?: string
+          restaurant_id: string
+          sale_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string
+          note?: string | null
+          payment_date?: string
+          restaurant_id?: string
+          sale_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           avg_cost: number
@@ -299,6 +353,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          amount_received: number
           created_at: string
           created_by: string | null
           discount: number
@@ -306,6 +361,7 @@ export type Database = {
           id: string
           invoice_no: string
           notes: string | null
+          payment_status: string
           restaurant_id: string | null
           sale_date: string
           subtotal: number
@@ -313,6 +369,7 @@ export type Database = {
           total_cost: number
         }
         Insert: {
+          amount_received?: number
           created_at?: string
           created_by?: string | null
           discount?: number
@@ -320,6 +377,7 @@ export type Database = {
           id?: string
           invoice_no?: string
           notes?: string | null
+          payment_status?: string
           restaurant_id?: string | null
           sale_date?: string
           subtotal?: number
@@ -327,6 +385,7 @@ export type Database = {
           total_cost?: number
         }
         Update: {
+          amount_received?: number
           created_at?: string
           created_by?: string | null
           discount?: number
@@ -334,6 +393,7 @@ export type Database = {
           id?: string
           invoice_no?: string
           notes?: string | null
+          payment_status?: string
           restaurant_id?: string | null
           sale_date?: string
           subtotal?: number
