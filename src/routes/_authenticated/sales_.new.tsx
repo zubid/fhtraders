@@ -27,6 +27,7 @@ function NewSale() {
   const [discount, setDiscount] = useState(0);
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
+  const [received, setReceived] = useState(0);
   const [lines, setLines] = useState<Line[]>([]);
   const [term, setTerm] = useState("");
 
@@ -71,7 +72,7 @@ function NewSale() {
       if (hasOverstock) throw new Error("One or more items exceed available stock");
       const { data: sale, error: sErr } = await supabase
         .from("sales")
-        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, notes: notes || null })
+        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, amount_received: Math.min(received, grandTotal), notes: notes || null })
         .select("id").single();
       if (sErr) throw sErr;
       const items = lines.map((l) => ({
