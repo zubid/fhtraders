@@ -11,6 +11,9 @@ import {
   LogOut,
   Warehouse,
   HandCoins,
+  Wallet,
+  Users,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,12 +28,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
+import { useSettings } from "@/hooks/useSettings";
 
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Purchases", url: "/purchases", icon: ShoppingCart },
   { title: "Sales", url: "/sales", icon: Receipt },
   { title: "Payments", url: "/payments", icon: HandCoins },
+  { title: "Expenses", url: "/expenses", icon: Wallet },
   { title: "Stock", url: "/stock", icon: Boxes },
 ];
 
@@ -38,12 +43,17 @@ const catalogItems = [
   { title: "Restaurants", url: "/restaurants", icon: Store },
   { title: "Products", url: "/products", icon: Package },
   { title: "Categories", url: "/categories", icon: Tags },
+  { title: "Employees", url: "/employees", icon: Users },
 ];
 
-const adminItems = [{ title: "Reports", url: "/reports", icon: BarChart3 }];
+const adminItems = [
+  { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Settings", url: "/settings", icon: Settings },
+];
 
 export function AppSidebar() {
   const { isAdmin, signOut, user, role } = useAuth();
+  const { settings } = useSettings();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
 
@@ -51,12 +61,16 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Warehouse className="h-5 w-5" />
-          </div>
+          {settings.logo_url ? (
+            <img src={settings.logo_url} alt="logo" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <Warehouse className="h-5 w-5" />
+            </div>
+          )}
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-bold leading-tight text-sidebar-foreground">StockFlow</span>
-            <span className="text-[11px] text-sidebar-foreground/60">Distribution System</span>
+            <span className="truncate text-sm font-bold leading-tight text-sidebar-foreground">{settings.business_name}</span>
+            <span className="truncate text-[11px] text-sidebar-foreground/60">{settings.business_tagline}</span>
           </div>
         </div>
       </SidebarHeader>
