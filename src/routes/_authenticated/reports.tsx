@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
@@ -9,6 +9,7 @@ import { RangePicker } from "@/components/app/RangePicker";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalytics, useDateRange } from "@/lib/useAnalytics";
 import { formatCurrency, formatNumber, downloadCSV } from "@/lib/format";
+import { printReport } from "@/lib/print";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,9 +44,30 @@ function ReportsPage() {
     downloadCSV("sales-by-category.csv", rows);
   };
 
+  const printRestaurants = () =>
+    printReport({
+      title: "Sales by Restaurant",
+      subtitle: `${range.from} to ${range.to}`,
+      columns: [
+        { key: "name", label: "Restaurant" },
+        { key: "orders", label: "Orders", align: "right" },
+        { key: "sales", label: "Sales", align: "right" },
+        { key: "profit", label: "Profit", align: "right" },
+      ],
+      rows: a.byRestaurant.map((r) => ({ name: r.name, orders: r.orders, sales: formatCurrency(r.sales), profit: formatCurrency(r.profit) })),
+      summary: [
+        { label: "Total Revenue", value: formatCurrency(a.totalSales) },
+        { label: "Total Profit", value: formatCurrency(a.profit) },
+      ],
+    });
+
   return (
     <div>
-      <PageHeader title="Profit & Sales Reports" description="Financial analytics across the selected date range" />
+      <PageHeader
+        title="Profit & Sales Reports"
+        description="Financial analytics across the selected date range"
+        actions={<Button variant="outline" onClick={printRestaurants}><Printer className="mr-1 h-4 w-4" />Print Report</Button>}
+      />
       <div className="mb-6"><RangePicker preset={preset} setPreset={setPreset} custom={custom} setCustom={setCustom} /></div>
 
       {a.isLoading ? (
