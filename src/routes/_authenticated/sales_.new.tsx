@@ -17,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/sales_/new")({
   component: NewSale,
 });
 
-type Line = { product_id: string; name: string; unit: string; quantity: number; unit_price: number; stock: number };
+type Line = { product_id: string; name: string; unit: string; quantity: number; unit_price: number; stock: number; cost: number };
 
 function NewSale() {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ function NewSale() {
   const { data: products } = useQuery({
     queryKey: ["products-sale"],
     queryFn: async () =>
-      (await supabase.from("products").select("id,name,unit,sku,current_stock,default_selling_price,categories(name)").order("name")).data ?? [],
+      (await supabase.from("products").select("id,name,unit,sku,current_stock,avg_cost,categories(name)").order("name")).data ?? [],
   });
 
   const results = useMemo(() => {
@@ -55,7 +55,7 @@ function NewSale() {
 
   const addLine = (p: any) => {
     if (lines.some((l) => l.product_id === p.id)) { setTerm(""); return; }
-    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: Number(p.default_selling_price), stock: Number(p.current_stock) }]);
+    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0, stock: Number(p.current_stock), cost: Number(p.avg_cost) }]);
     setTerm("");
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -132,7 +132,10 @@ function NewSale() {
                           <Input type="number" min="0" step="any" className={`w-24 ${over ? "border-destructive" : ""}`} value={l.quantity} onChange={(e) => updateLine(i, { quantity: +e.target.value })} />
                           {over && <span className="mt-1 flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3 w-3" />Exceeds stock</span>}
                         </TableCell>
-                        <TableCell><Input type="number" min="0" step="0.01" className="w-28" value={l.unit_price} onChange={(e) => updateLine(i, { unit_price: +e.target.value })} /></TableCell>
+                        <TableCell>
+                          <Input type="number" min="0" step="0.01" className="w-28" placeholder="0.00" value={l.unit_price || ""} onChange={(e) => updateLine(i, { unit_price: +e.target.value })} />
+                          {l.cost > 0 && <div className="mt-1 text-xs text-muted-foreground">Last cost: {formatCurrency(l.cost)}</div>}
+                        </TableCell>
                         <TableCell className="text-right font-medium">{formatCurrency(l.quantity * l.unit_price)}</TableCell>
                         <TableCell><Button variant="ghost" size="icon" onClick={() => removeLine(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                       </TableRow>
