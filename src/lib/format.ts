@@ -1,10 +1,23 @@
+// Runtime-configurable formatting driven by app settings.
+let _currencySymbol = "AED";
+let _dateFormat = "dd MMM yyyy";
+
+export function setFormatConfig(cfg: { currencySymbol?: string; dateFormat?: string }) {
+  if (cfg.currencySymbol) _currencySymbol = cfg.currencySymbol;
+  if (cfg.dateFormat) _dateFormat = cfg.dateFormat;
+}
+
+export function getCurrencySymbol() {
+  return _currencySymbol;
+}
+
 export function formatCurrency(value: number | null | undefined): string {
   const n = Number(value ?? 0);
-  return new Intl.NumberFormat("en-AE", {
-    style: "currency",
-    currency: "AED",
+  const num = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(n);
+  return `${_currencySymbol} ${num}`;
 }
 
 export function formatNumber(value: number | null | undefined, digits = 2): string {
@@ -15,10 +28,25 @@ export function formatNumber(value: number | null | undefined, digits = 2): stri
   }).format(n);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return "-";
-  const d = typeof value === "string" ? new Date(value) : value;
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const d = typeof value === "string" ? new Date(value.length <= 10 ? value + "T00:00:00" : value) : value;
+  if (isNaN(d.getTime())) return "-";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  switch (_dateFormat) {
+    case "dd/MM/yyyy":
+      return `${dd}/${mm}/${yyyy}`;
+    case "MM/dd/yyyy":
+      return `${mm}/${dd}/${yyyy}`;
+    case "yyyy-MM-dd":
+      return `${yyyy}-${mm}-${dd}`;
+    default:
+      return `${dd} ${MONTHS[d.getMonth()]} ${yyyy}`;
+  }
 }
 
 export type StockStatus = "out" | "low" | "high" | "normal";
