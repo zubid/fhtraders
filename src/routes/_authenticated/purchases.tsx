@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye } from "lucide-react";
+import { Plus, Trash2, Eye, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { printPurchase } from "@/lib/print";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -95,6 +96,7 @@ function PurchasesPage() {
                     <TableCell className="text-right font-medium">{formatCurrency(p.grand_total)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => printPurchase(p)}><Printer className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </TableCell>
                   </TableRow>
@@ -125,6 +127,7 @@ function PurchasesPage() {
                 </TableBody>
               </Table>
               <div className="mt-4 flex justify-end text-lg font-bold">Total: {formatCurrency(view.grand_total)}</div>
+              <Button className="mt-4 w-full" variant="outline" onClick={() => printPurchase(view)}><Printer className="mr-1 h-4 w-4" />Print / Download PDF</Button>
             </div>
           )}
         </DialogContent>

@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { PaymentStatusBadge } from "@/components/app/PaymentStatusBadge";
 import { ReceivePaymentDialog } from "@/components/app/ReceivePaymentDialog";
 import { saleBalance, METHOD_LABELS } from "@/lib/credit";
-import { printInvoice } from "@/lib/invoice";
+import { printInvoice, printStatement } from "@/lib/invoice";
 import { formatCurrency, formatDate, formatNumber, downloadCSV } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -151,6 +151,7 @@ function RestaurantProfile() {
         description={restaurant.is_active ? "Active account" : "Inactive account"}
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => printStatement({ restaurant, sales: sales ?? [], payments: payments ?? [] })}><Printer className="mr-1 h-4 w-4" />Statement (PDF)</Button>
             <Button variant="outline" onClick={exportStatement}><Download className="mr-1 h-4 w-4" />Statement (CSV)</Button>
             <Button onClick={() => setPayOpen(true)}><HandCoins className="mr-1 h-4 w-4" />Receive Payment</Button>
           </div>

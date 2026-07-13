@@ -34,7 +34,6 @@ type Product = {
 
 const emptyForm = {
   name: "", category_id: "", unit: "pcs", reorder_level: 0, max_stock_level: 0,
-  default_purchase_price: 0, default_selling_price: 0,
 };
 
 function ProductsPage() {
@@ -89,8 +88,6 @@ function ProductsPage() {
         unit: form.unit,
         reorder_level: Number(form.reorder_level),
         max_stock_level: Number(form.max_stock_level),
-        default_purchase_price: Number(form.default_purchase_price),
-        default_selling_price: Number(form.default_selling_price),
       };
       if (editing) {
         const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
@@ -131,7 +128,6 @@ function ProductsPage() {
     setForm({
       name: p.name, category_id: p.category_id ?? "", unit: p.unit,
       reorder_level: p.reorder_level, max_stock_level: p.max_stock_level,
-      default_purchase_price: p.default_purchase_price, default_selling_price: p.default_selling_price,
     });
     setOpen(true);
   };
@@ -173,7 +169,6 @@ function ProductsPage() {
                   <TableHead>SKU</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Buy / Sell</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -185,7 +180,6 @@ function ProductsPage() {
                     <TableCell className="font-mono text-xs text-muted-foreground">{p.sku}</TableCell>
                     <TableCell>{p.categories?.name ?? "-"}</TableCell>
                     <TableCell className="text-right">{formatNumber(p.current_stock)} {p.unit}</TableCell>
-                    <TableCell className="text-right text-sm">{formatCurrency(p.default_purchase_price)} / {formatCurrency(p.default_selling_price)}</TableCell>
                     <TableCell><StockBadge current={p.current_stock} reorder={p.reorder_level} max={p.max_stock_level} /></TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
@@ -234,14 +228,6 @@ function ProductsPage() {
             <div className="space-y-2">
               <Label>Max Stock (high)</Label>
               <Input type="number" value={form.max_stock_level} onChange={(e) => setForm({ ...form, max_stock_level: +e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Purchase Price</Label>
-              <Input type="number" step="0.01" value={form.default_purchase_price} onChange={(e) => setForm({ ...form, default_purchase_price: +e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Selling Price</Label>
-              <Input type="number" step="0.01" value={form.default_selling_price} onChange={(e) => setForm({ ...form, default_selling_price: +e.target.value })} />
             </div>
           </div>
           <DialogFooter>

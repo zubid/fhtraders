@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { TrendingUp, ShoppingCart, DollarSign, Percent, Package, Store, AlertTriangle } from "lucide-react";
+import { TrendingUp, ShoppingCart, DollarSign, Percent, Package, Store, AlertTriangle, Wallet, PiggyBank, CreditCard } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
@@ -57,7 +57,7 @@ function Dashboard() {
           <Kpi title="Total Purchases" value={formatCurrency(a.totalPurchases)} icon={<ShoppingCart className="h-5 w-5" />} accent="bg-chart-5/10 text-chart-5" />
           {isAdmin ? (
             <>
-              <Kpi title="Total Profit" value={formatCurrency(a.profit)} icon={<DollarSign className="h-5 w-5" />} accent="bg-accent/20 text-accent-foreground" />
+              <Kpi title="Gross Profit" value={formatCurrency(a.grossProfit)} icon={<DollarSign className="h-5 w-5" />} accent="bg-accent/20 text-accent-foreground" />
               <Kpi title="Profit Margin" value={`${formatNumber(a.margin, 1)}%`} icon={<Percent className="h-5 w-5" />} />
             </>
           ) : (
@@ -66,6 +66,15 @@ function Dashboard() {
               <Kpi title="Low Stock Items" value={String(lowCount)} icon={<AlertTriangle className="h-5 w-5" />} accent="bg-warning/15 text-warning-foreground" />
             </>
           )}
+        </div>
+      )}
+
+      {!a.isLoading && isAdmin && (
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi title="Total Expenses" value={formatCurrency(a.totalExpenses)} icon={<Wallet className="h-5 w-5" />} accent="bg-destructive/10 text-destructive" />
+          <Kpi title="Net Profit (after expenses)" value={formatCurrency(a.netProfit)} icon={<PiggyBank className="h-5 w-5" />} accent={a.netProfit >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"} />
+          <Kpi title="Outstanding Receivables" value={formatCurrency(a.outstanding)} icon={<CreditCard className="h-5 w-5" />} accent="bg-warning/15 text-warning-foreground" />
+          <Kpi title="Low Stock Items" value={String(lowCount)} icon={<AlertTriangle className="h-5 w-5" />} accent="bg-warning/15 text-warning-foreground" />
         </div>
       )}
 
