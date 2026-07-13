@@ -35,13 +35,13 @@ function NewPurchase() {
   });
   const { data: products } = useQuery({
     queryKey: ["products-min"],
-    queryFn: async () => (await supabase.from("products").select("id,name,unit,default_purchase_price").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("products").select("id,name,unit").order("name")).data ?? [],
   });
 
   const addLine = (pid: string) => {
     const p = (products ?? []).find((x) => x.id === pid);
     if (!p || lines.some((l) => l.product_id === pid)) return;
-    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: Number(p.default_purchase_price) }]);
+    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0 }]);
     setPickProduct("");
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
