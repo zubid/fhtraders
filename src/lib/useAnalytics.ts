@@ -27,14 +27,42 @@ export function useAnalytics(from: string, to: string) {
         .lte("sale_date", to)).data ?? [],
   });
 
+  const expenses = useQuery({
+    queryKey: ["an-expenses", from, to],
+    queryFn: async () =>
+      (await supabase
+        .from("expenses")
+        .select("id,expense_date,type,amount")
+        .gte("expense_date", from)
+        .lte("expense_date", to)).data ?? [],
+  });
+
+  const receivables = useQuery({
+    queryKey: ["an-receivables", from, to],
+    queryFn: async () =>
+      (await supabase
+        .from("sales")
+        .select("grand_total,amount_received")
+        .gte("sale_date", from)
+        .lte("sale_date", to)).data ?? [],
+  });
+
   const derived = useMemo(() => {
     const s = sales.data ?? [];
     const p = purchases.data ?? [];
+    const ex = expenses.data ?? [];
+    const rec = receivables.data ?? [];
     const totalSales = s.reduce((a, x) => a + Number(x.grand_total), 0);
     const totalCost = s.reduce((a, x) => a + Number(x.total_cost), 0);
     const totalPurchases = p.reduce((a, x) => a + Number(x.grand_total), 0);
     const profit = totalSales - totalCost;
     const margin = totalSales > 0 ? (profit / totalSales) * 100 : 0;
+    const totalExpenses = ex.reduce((a, x) => a + Number(x.amount), 0);
+    const salaryExpenses = ex.filter((x: any) => x.type === "salary").reduce((a: number, x: any) => a + Number(x.amount), 0);
+    const generalExpenses = totalExpenses - salaryExpenses;
+    const grossProfit = profit;
+    const netProfit = grossProfit - totalExpenses;
+    const outstanding = rec.reduce((a: number, x: any) => a + Math.max(0, Number(x.grand_total) - Number(x.amount_received)), 0);
 
     const byRestaurant = new Map<string, { name: string; sales: number; cost: number; orders: number }>();
     const byCategory = new Map<string, { revenue: number; cost: number }>();
@@ -68,13 +96,14 @@ export function useAnalytics(from: string, to: string) {
 
     return {
       totalSales, totalCost, totalPurchases, profit, margin,
+      totalExpenses, salaryExpenses, generalExpenses, grossProfit, netProfit, outstanding,
       orders: s.length,
       byRestaurant: [...byRestaurant.values()].map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.sales - a.sales),
       byCategory: [...byCategory.entries()].map(([name, v]) => ({ name, revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost })).sort((a, b) => b.revenue - a.revenue),
       byProduct: [...byProduct.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 8),
       trend,
     };
-  }, [sales.data, purchases.data]);
+  }, [sales.data, purchases.data, expenses.data, receivables.data]);
 
-  return { ...derived, isLoading: sales.isLoading || purchases.isLoading };
+  return { ...derived, isLoading: sales.isLoading || purchases.isLoading || expenses.isLoading };
 }
