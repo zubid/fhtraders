@@ -69,6 +69,7 @@ function NewSale() {
     mutationFn: async () => {
       if (lines.length === 0) throw new Error("Add at least one product");
       if (!restaurantId) throw new Error("Select a restaurant");
+      if (lines.some((l) => !l.unit_price || l.unit_price <= 0)) throw new Error("Enter a selling price for every item");
       if (hasOverstock) throw new Error("One or more items exceed available stock");
       const { data: sale, error: sErr } = await supabase
         .from("sales")
