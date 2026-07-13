@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          address: string | null
+          business_name: string
+          business_tagline: string
+          created_at: string
+          currency_symbol: string
+          date_format: string
+          email: string | null
+          id: string
+          invoice_footer: string
+          logo_url: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          business_name?: string
+          business_tagline?: string
+          created_at?: string
+          currency_symbol?: string
+          date_format?: string
+          email?: string | null
+          id?: string
+          invoice_footer?: string
+          logo_url?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          business_name?: string
+          business_tagline?: string
+          created_at?: string
+          currency_symbol?: string
+          date_format?: string
+          email?: string | null
+          id?: string
+          invoice_footer?: string
+          logo_url?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           color: string
@@ -46,6 +91,117 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      employees: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          monthly_salary: number
+          name: string
+          phone: string | null
+          position: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          name: string
+          phone?: string | null
+          position?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          name?: string
+          phone?: string | null
+          position?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expense_categories: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          employee_id: string | null
+          expense_date: string
+          id: string
+          salary_month: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id?: string | null
+          expense_date?: string
+          id?: string
+          salary_month?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id?: string | null
+          expense_date?: string
+          id?: string
+          salary_month?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
