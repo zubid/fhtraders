@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PAYMENT_METHODS, METHOD_LABELS } from "@/lib/supplier-credit";
 
 export const Route = createFileRoute("/_authenticated/purchases_/new")({
   component: NewPurchase,
@@ -28,6 +29,8 @@ function NewPurchase() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [pickProduct, setPickProduct] = useState("");
+  const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [payMethod, setPayMethod] = useState<string>("cash");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -58,9 +61,10 @@ function NewPurchase() {
         if (error) throw error;
         sid = data.id;
       }
+      const paidNow = Math.max(0, Math.min(Number(amountPaid) || 0, grandTotal));
       const { data: purchase, error: pErr } = await supabase
         .from("purchases")
-        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null })
+        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null, amount_paid: paidNow } as any)
         .select("id").single();
       if (pErr) throw pErr;
       const items = lines.map((l) => ({
@@ -69,6 +73,18 @@ function NewPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
+      if (paidNow > 0 && sid) {
+        const { data: userData } = await supabase.auth.getUser();
+        await (supabase.from("supplier_payments" as any) as any).insert({
+          supplier_id: sid,
+          purchase_id: purchase.id,
+          amount: paidNow,
+          method: payMethod,
+          payment_date: date,
+          note: "Paid at purchase",
+          created_by: userData.user?.id ?? null,
+        });
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries();
@@ -133,6 +149,28 @@ function NewPurchase() {
             <div className="flex items-center justify-between border-t border-border pt-4 text-lg font-bold">
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>
             </div>
+            <div className="space-y-2">
+              <Label>Amount Paid Now</Label>
+              <div className="flex gap-2">
+                <Input type="number" min="0" step="0.01" value={amountPaid}
+                  onChange={(e) => setAmountPaid(+e.target.value)} placeholder="0.00" />
+                <Button type="button" variant="outline" size="sm" onClick={() => setAmountPaid(Number(grandTotal.toFixed(2)))}>Full</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Balance: {formatCurrency(Math.max(0, grandTotal - (Number(amountPaid) || 0)))} · pay later from the Suppliers page.
+              </p>
+            </div>
+            {Number(amountPaid) > 0 && (
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <Select value={payMethod} onValueChange={setPayMethod}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{METHOD_LABELS[m]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Purchase
             </Button>

@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
 import { Route as AuthenticatedStockRouteImport } from './routes/_authenticated/stock'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSalesRouteImport } from './routes/_authenticated/sales'
@@ -25,6 +26,7 @@ import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEmployeesRouteImport } from './routes/_authenticated/employees'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
+import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers_.$id'
 import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
 import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases_.new'
@@ -47,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSuppliersRoute = AuthenticatedSuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedStockRoute = AuthenticatedStockRouteImport.update({
   id: '/stock',
@@ -109,6 +116,12 @@ const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSuppliersIdRoute =
+  AuthenticatedSuppliersIdRouteImport.update({
+    id: '/suppliers_/$id',
+    path: '/suppliers/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSalesNewRoute = AuthenticatedSalesNewRouteImport.update({
   id: '/sales_/new',
   path: '/sales/new',
@@ -143,9 +156,11 @@ export interface FileRoutesByFullPath {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock': typeof AuthenticatedStockRoute
+  '/suppliers': typeof AuthenticatedSuppliersRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
+  '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -163,9 +178,11 @@ export interface FileRoutesByTo {
   '/sales': typeof AuthenticatedSalesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock': typeof AuthenticatedStockRoute
+  '/suppliers': typeof AuthenticatedSuppliersRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
+  '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -185,9 +202,11 @@ export interface FileRoutesById {
   '/_authenticated/sales': typeof AuthenticatedSalesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/stock': typeof AuthenticatedStockRoute
+  '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
   '/_authenticated/purchases_/new': typeof AuthenticatedPurchasesNewRoute
   '/_authenticated/restaurants_/$id': typeof AuthenticatedRestaurantsIdRoute
   '/_authenticated/sales_/new': typeof AuthenticatedSalesNewRoute
+  '/_authenticated/suppliers_/$id': typeof AuthenticatedSuppliersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -207,9 +226,11 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stock'
+    | '/suppliers'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
+    | '/suppliers/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -227,9 +248,11 @@ export interface FileRouteTypes {
     | '/sales'
     | '/settings'
     | '/stock'
+    | '/suppliers'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
+    | '/suppliers/$id'
   id:
     | '__root__'
     | '/'
@@ -248,9 +271,11 @@ export interface FileRouteTypes {
     | '/_authenticated/sales'
     | '/_authenticated/settings'
     | '/_authenticated/stock'
+    | '/_authenticated/suppliers'
     | '/_authenticated/purchases_/new'
     | '/_authenticated/restaurants_/$id'
     | '/_authenticated/sales_/new'
+    | '/_authenticated/suppliers_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -289,6 +314,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/suppliers': {
+      id: '/_authenticated/suppliers'
+      path: '/suppliers'
+      fullPath: '/suppliers'
+      preLoaderRoute: typeof AuthenticatedSuppliersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/stock': {
       id: '/_authenticated/stock'
@@ -374,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/suppliers_/$id': {
+      id: '/_authenticated/suppliers_/$id'
+      path: '/suppliers/$id'
+      fullPath: '/suppliers/$id'
+      preLoaderRoute: typeof AuthenticatedSuppliersIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/sales_/new': {
       id: '/_authenticated/sales_/new'
       path: '/sales/new'
@@ -411,9 +450,11 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSalesRoute: typeof AuthenticatedSalesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStockRoute: typeof AuthenticatedStockRoute
+  AuthenticatedSuppliersRoute: typeof AuthenticatedSuppliersRoute
   AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
   AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
   AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
+  AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -429,9 +470,11 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSalesRoute: AuthenticatedSalesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStockRoute: AuthenticatedStockRoute,
+  AuthenticatedSuppliersRoute: AuthenticatedSuppliersRoute,
   AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
   AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
   AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
+  AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
