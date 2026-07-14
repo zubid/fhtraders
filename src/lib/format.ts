@@ -1,5 +1,5 @@
 // Runtime-configurable formatting driven by app settings.
-let _currencySymbol = "AED";
+let _currencySymbol = "PKR";
 let _dateFormat = "dd MMM yyyy";
 
 export function setFormatConfig(cfg: { currencySymbol?: string; dateFormat?: string }) {

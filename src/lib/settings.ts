@@ -21,7 +21,7 @@ export const DEFAULT_BRANDING: Branding = {
   address: null,
   phone: null,
   email: null,
-  currency_symbol: "AED",
+  currency_symbol: "PKR",
   date_format: "dd MMM yyyy",
   invoice_footer: "Thank you for your business.",
 };

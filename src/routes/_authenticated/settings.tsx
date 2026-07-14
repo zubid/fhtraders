@@ -55,7 +55,7 @@ function SettingsPage() {
         address: form.address || null,
         phone: form.phone || null,
         email: form.email || null,
-        currency_symbol: form.currency_symbol || "AED",
+        currency_symbol: form.currency_symbol || "PKR",
         date_format: form.date_format || "dd MMM yyyy",
         invoice_footer: form.invoice_footer || "",
       };
