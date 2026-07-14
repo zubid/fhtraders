@@ -2,10 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, Printer } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, HandCoins } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
+import { PaymentStatusBadge } from "@/components/app/PaymentStatusBadge";
+import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
+import { purchaseBalance } from "@/lib/supplier-credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { printPurchase } from "@/lib/print";
 import { Button } from "@/components/ui/button";
@@ -27,6 +30,7 @@ function PurchasesPage() {
   const [to, setTo] = useState("");
   const [toDelete, setToDelete] = useState<any>(null);
   const [view, setView] = useState<any>(null);
+  const [payFor, setPayFor] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["purchases"],
@@ -83,7 +87,9 @@ function PurchasesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Reference</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">Items</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Items</TableHead><TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Paid</TableHead><TableHead className="text-right">Balance</TableHead>
+                  <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -94,7 +100,13 @@ function PurchasesPage() {
                     <TableCell>{p.suppliers?.name ?? "-"}</TableCell>
                     <TableCell className="text-right">{p.purchase_items?.length ?? 0}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(p.grand_total)}</TableCell>
+                    <TableCell className="text-right text-success">{formatCurrency((p as any).amount_paid ?? 0)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(purchaseBalance(p as any))}</TableCell>
+                    <TableCell><PaymentStatusBadge status={(p as any).payment_status ?? "unpaid"} /></TableCell>
                     <TableCell className="text-right">
+                      {p.supplier_id && purchaseBalance(p as any) > 0.001 && (
+                        <Button variant="ghost" size="icon" title="Pay" onClick={() => setPayFor(p)}><HandCoins className="h-4 w-4" /></Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => printPurchase(p)}><Printer className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -140,6 +152,16 @@ function PurchasesPage() {
         description="This reverses the stock that was added by this purchase."
         onConfirm={() => toDelete && del.mutate(toDelete.id)}
       />
+
+      {payFor && (
+        <PaySupplierDialog
+          open={!!payFor}
+          onOpenChange={(v) => !v && setPayFor(null)}
+          supplierId={payFor.supplier_id}
+          supplierName={payFor.suppliers?.name}
+          presetPurchaseId={payFor.id}
+        />
+      )}
     </div>
   );
 }

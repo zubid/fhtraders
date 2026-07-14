@@ -381,31 +381,37 @@ export type Database = {
       }
       purchases: {
         Row: {
+          amount_paid: number
           created_at: string
           created_by: string | null
           grand_total: number
           id: string
           notes: string | null
+          payment_status: string
           purchase_date: string
           reference_no: string
           supplier_id: string | null
         }
         Insert: {
+          amount_paid?: number
           created_at?: string
           created_by?: string | null
           grand_total?: number
           id?: string
           notes?: string | null
+          payment_status?: string
           purchase_date?: string
           reference_no?: string
           supplier_id?: string | null
         }
         Update: {
+          amount_paid?: number
           created_at?: string
           created_by?: string | null
           grand_total?: number
           id?: string
           notes?: string | null
+          payment_status?: string
           purchase_date?: string
           reference_no?: string
           supplier_id?: string | null
@@ -603,6 +609,60 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          method: string
+          note: string | null
+          payment_date: string
+          purchase_id: string | null
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string
+          note?: string | null
+          payment_date?: string
+          purchase_id?: string | null
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          method?: string
+          note?: string | null
+          payment_date?: string
+          purchase_id?: string | null
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
