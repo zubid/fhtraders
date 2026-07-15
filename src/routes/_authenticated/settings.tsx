@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload, Save, KeyRound, Users, Trash2, ShieldAlert } from "lucide-react";
+import { Upload, Save, KeyRound, Users, Trash2, ShieldAlert, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { adminCreateUser, adminDeleteUser } from "@/lib/admin-users.functions";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -43,6 +46,11 @@ function SettingsPage() {
   const [form, setForm] = useState({ ...DEFAULT_BRANDING });
   const [pw, setPw] = useState({ next: "", confirm: "" });
   const [wipeOpen, setWipeOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ full_name: "", email: "", password: "", role: "staff" as "admin" | "staff" });
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; email: string } | null>(null);
+  const createUserFn = useServerFn(adminCreateUser);
+  const deleteUserFn = useServerFn(adminDeleteUser);
 
   useEffect(() => { setForm({ ...DEFAULT_BRANDING, ...settings }); }, [settings.id]);
 
@@ -120,6 +128,28 @@ function SettingsPage() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast.success("Role updated"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createUser = useMutation({
+    mutationFn: async () => {
+      if (!newUser.full_name || !newUser.email || newUser.password.length < 6) {
+        throw new Error("Fill all fields (password ≥ 6 chars)");
+      }
+      await createUserFn({ data: newUser });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      setCreateOpen(false);
+      setNewUser({ full_name: "", email: "", password: "", role: "staff" });
+      toast.success("User created");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => { await deleteUserFn({ data: { user_id: userId } }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); setDeleteTarget(null); toast.success("User deleted"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -207,10 +237,42 @@ function SettingsPage() {
 
         <TabsContent value="users">
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" />User Management</CardTitle><CardDescription>Assign admin or staff access.</CardDescription></CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" />User Management</CardTitle>
+                <CardDescription>Only admins can create, remove or change user roles.</CardDescription>
+              </div>
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><UserPlus className="mr-1 h-4 w-4" />Add User</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create user</DialogTitle>
+                    <DialogDescription>New accounts are created here — there is no public sign-up.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-2"><Label>Full name</Label><Input value={newUser.full_name} onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>Email</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} /></div>
+                    <div className="space-y-2"><Label>Password</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} /></div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v as "admin" | "staff" })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="admin">Admin</SelectItem><SelectItem value="staff">Staff</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                    <Button onClick={() => createUser.mutate()} disabled={createUser.isPending}>Create</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
             <CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Change</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {(users ?? []).map((u: any) => (
                     <TableRow key={u.id}>
@@ -218,10 +280,15 @@ function SettingsPage() {
                       <TableCell>{u.email}</TableCell>
                       <TableCell><Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge></TableCell>
                       <TableCell className="text-right">
-                        <Select value={u.role} onValueChange={(v) => setRole.mutate({ userId: u.id, role: v })} disabled={u.id === user?.id}>
-                          <SelectTrigger className="ml-auto w-32"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="admin">Admin</SelectItem><SelectItem value="staff">Staff</SelectItem></SelectContent>
-                        </Select>
+                        <div className="flex items-center justify-end gap-2">
+                          <Select value={u.role} onValueChange={(v) => setRole.mutate({ userId: u.id, role: v })} disabled={u.id === user?.id}>
+                            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="admin">Admin</SelectItem><SelectItem value="staff">Staff</SelectItem></SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" disabled={u.id === user?.id} onClick={() => setDeleteTarget({ id: u.id, email: u.email })}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -250,6 +317,14 @@ function SettingsPage() {
         description="This cannot be undone. All transactional and catalog data will be removed."
         confirmLabel="Delete everything"
         onConfirm={() => wipe.mutate()}
+      />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete user?"
+        description={deleteTarget ? `Permanently remove ${deleteTarget.email}? This cannot be undone.` : ""}
+        confirmLabel="Delete user"
+        onConfirm={() => deleteTarget && deleteUser.mutate(deleteTarget.id)}
       />
     </div>
   );
