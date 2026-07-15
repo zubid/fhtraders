@@ -11,22 +11,14 @@ const createUserSchema = z.object({
 
 const deleteUserSchema = z.object({ user_id: z.string().uuid() });
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden: admin only");
-}
-
 export const adminCreateUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => createUserSchema.parse(d))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const check = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+    if (check.error) throw new Error(check.error.message);
+    if (!check.data) throw new Error("Forbidden: admin only");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
       email: data.email,
@@ -49,7 +41,10 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => deleteUserSchema.parse(d))
   .handler(async ({ data, context }) => {
-    await assertAdmin(context);
+    const check = await context.supabase
+      .from("user_roles").select("role").eq("user_id", context.userId).eq("role", "admin").maybeSingle();
+    if (check.error) throw new Error(check.error.message);
+    if (!check.data) throw new Error("Forbidden: admin only");
     if (data.user_id === context.userId) throw new Error("You cannot delete your own account");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
