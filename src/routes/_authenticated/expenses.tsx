@@ -34,13 +34,19 @@ function ExpensesPage() {
   const [catOpen, setCatOpen] = useState(false);
   const [toDelete, setToDelete] = useState<any>(null);
 
-  const [gen, setGen] = useState({ expense_date: today(), category_id: "", amount: 0, description: "" });
-  const [sal, setSal] = useState({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "" });
+  const [gen, setGen] = useState({ expense_date: today(), category_id: "", amount: 0, description: "", vault_user_id: "" });
+  const [sal, setSal] = useState({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "", vault_user_id: "" });
   const [catName, setCatName] = useState("");
+  const [vaultFilter, setVaultFilter] = useState<string>("all");
 
   const { data: cats } = useQuery({
     queryKey: ["expense_categories"],
     queryFn: async () => (await supabase.from("expense_categories").select("*").order("name")).data ?? [],
+  });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
   const { data: employees } = useQuery({
     queryKey: ["employees-active"],
@@ -51,12 +57,15 @@ function ExpensesPage() {
     queryFn: async () =>
       (await supabase
         .from("expenses")
-        .select("*, expense_categories(name), employees(name)")
+        .select("*, expense_categories(name), employees(name), vault_users(name)")
         .order("expense_date", { ascending: false })).data ?? [],
   });
 
   const inRange = (e: any) => e.expense_date >= from && e.expense_date <= to;
-  const filtered = useMemo(() => (expenses ?? []).filter(inRange), [expenses, from, to]);
+  const filtered = useMemo(
+    () => (expenses ?? []).filter((e: any) => inRange(e) && (vaultFilter === "all" ? true : vaultFilter === "none" ? !e.vault_user_id : e.vault_user_id === vaultFilter)),
+    [expenses, from, to, vaultFilter],
+  );
   const general = filtered.filter((e: any) => e.type === "general");
   const salaries = filtered.filter((e: any) => e.type === "salary");
   const totalGeneral = general.reduce((s: number, e: any) => s + Number(e.amount), 0);
@@ -69,10 +78,11 @@ function ExpensesPage() {
       const { error } = await supabase.from("expenses").insert({
         type: "general", expense_date: gen.expense_date, category_id: gen.category_id || null,
         amount: Number(gen.amount), description: gen.description || null, created_by: u.user?.id ?? null,
+        vault_user_id: gen.vault_user_id || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expenses"] }); setGenOpen(false); toast.success("Expense added"); },
+    onSuccess: () => { qc.invalidateQueries(); setGenOpen(false); toast.success("Expense added"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -85,10 +95,11 @@ function ExpensesPage() {
         type: "salary", expense_date: sal.expense_date, employee_id: sal.employee_id,
         salary_month: sal.salary_month, amount: Number(sal.amount), description: sal.description || null,
         created_by: u.user?.id ?? null,
+        vault_user_id: sal.vault_user_id || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expenses"] }); setSalOpen(false); toast.success("Salary recorded"); },
+    onSuccess: () => { qc.invalidateQueries(); setSalOpen(false); toast.success("Salary recorded"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -111,8 +122,8 @@ function ExpensesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openGeneral = () => { setGen({ expense_date: today(), category_id: "", amount: 0, description: "" }); setGenOpen(true); };
-  const openSalary = () => { setSal({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "" }); setSalOpen(true); };
+  const openGeneral = () => { setGen({ expense_date: today(), category_id: "", amount: 0, description: "", vault_user_id: "" }); setGenOpen(true); };
+  const openSalary = () => { setSal({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "", vault_user_id: "" }); setSalOpen(true); };
 
   const printExpenses = () => {
     printReport({
