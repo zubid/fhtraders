@@ -195,13 +195,14 @@ function ExpensesPage() {
               <div className="py-12 text-center text-muted-foreground">No general expenses in this range.</div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead>Vault User</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {general.map((e: any) => (
                     <TableRow key={e.id}>
                       <TableCell>{formatDate(e.expense_date)}</TableCell>
                       <TableCell>{e.expense_categories?.name ?? "-"}</TableCell>
                       <TableCell>{e.description ?? "-"}</TableCell>
+                      <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
                       <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
@@ -219,7 +220,7 @@ function ExpensesPage() {
               <div className="py-12 text-center text-muted-foreground">No salary payments in this range.</div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Month</TableHead><TableHead>Note</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Month</TableHead><TableHead>Note</TableHead><TableHead>Vault User</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {salaries.map((e: any) => (
                     <TableRow key={e.id}>
@@ -227,6 +228,7 @@ function ExpensesPage() {
                       <TableCell className="font-medium">{e.employees?.name ?? "-"}</TableCell>
                       <TableCell>{e.salary_month ?? "-"}</TableCell>
                       <TableCell>{e.description ?? "-"}</TableCell>
+                      <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
                       <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
