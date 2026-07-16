@@ -19,6 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/purchases")({
   component: PurchasesPage,
@@ -31,25 +32,34 @@ function PurchasesPage() {
   const [toDelete, setToDelete] = useState<any>(null);
   const [view, setView] = useState<any>(null);
   const [payFor, setPayFor] = useState<any>(null);
+  const [vaultFilter, setVaultFilter] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
     queryKey: ["purchases"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, suppliers(name), purchase_items(id, quantity, unit_price, line_total, products(name, unit))")
+        .select("*, suppliers(name), vault_users(name), purchase_items(id, quantity, unit_price, line_total, products(name, unit))")
         .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data;
     },
+  });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
 
   const filtered = useMemo(() => {
     let rows = data ?? [];
     if (from) rows = rows.filter((r) => r.purchase_date >= from);
     if (to) rows = rows.filter((r) => r.purchase_date <= to);
+    if (vaultFilter !== "all") {
+      rows = rows.filter((r: any) => vaultFilter === "none" ? !r.vault_user_id : r.vault_user_id === vaultFilter);
+    }
     return rows;
-  }, [data, from, to]);
+  }, [data, from, to, vaultFilter]);
 
   const del = useMutation({
     mutationFn: async (id: string) => {
@@ -75,6 +85,17 @@ function PurchasesPage() {
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div><label className="text-xs text-muted-foreground">From</label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
           <div><label className="text-xs text-muted-foreground">To</label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+          <div className="min-w-[180px]">
+            <label className="text-xs text-muted-foreground">By Vault User</label>
+            <Select value={vaultFilter} onValueChange={setVaultFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="none">No vault user</SelectItem>
+                {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           {(from || to) && <Button variant="ghost" onClick={() => { setFrom(""); setTo(""); }}>Clear</Button>}
         </div>
         {isLoading ? (
@@ -86,7 +107,7 @@ function PurchasesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Reference</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead>
+                  <TableHead>Reference</TableHead><TableHead>Date</TableHead><TableHead>Supplier</TableHead><TableHead>Vault</TableHead>
                   <TableHead className="text-right">Items</TableHead><TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Paid</TableHead><TableHead className="text-right">Balance</TableHead>
                   <TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
@@ -98,6 +119,7 @@ function PurchasesPage() {
                     <TableCell className="font-mono text-xs">{p.reference_no}</TableCell>
                     <TableCell>{formatDate(p.purchase_date)}</TableCell>
                     <TableCell>{p.suppliers?.name ?? "-"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{(p as any).vault_users?.name ?? "-"}</TableCell>
                     <TableCell className="text-right">{p.purchase_items?.length ?? 0}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(p.grand_total)}</TableCell>
                     <TableCell className="text-right text-success">{formatCurrency((p as any).amount_paid ?? 0)}</TableCell>
