@@ -177,6 +177,20 @@ function NewPurchase() {
                 </Select>
               </div>
             )}
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={vaultUserId} onValueChange={setVaultUserId}>
+                <SelectTrigger><SelectValue placeholder="Optional — track who paid cash" /></SelectTrigger>
+                <SelectContent>
+                  {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {vaultUserId && (
+                <p className="text-xs text-muted-foreground">
+                  The paid amount will be deducted from this vault user's balance.
+                </p>
+              )}
+            </div>
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Purchase
             </Button>
