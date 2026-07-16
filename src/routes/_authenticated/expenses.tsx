@@ -162,6 +162,17 @@ function ExpensesPage() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div><Label className="text-xs text-muted-foreground">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
         <div><Label className="text-xs text-muted-foreground">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+        <div className="min-w-[180px]">
+          <Label className="text-xs text-muted-foreground">By Vault User</Label>
+          <Select value={vaultFilter} onValueChange={setVaultFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="none">No vault user</SelectItem>
+              {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
