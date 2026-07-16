@@ -134,6 +134,7 @@ function ExpensesPage() {
         { key: "type", label: "Type" },
         { key: "ref", label: "Category / Employee" },
         { key: "desc", label: "Description" },
+        { key: "vault", label: "Vault User" },
         { key: "amount", label: "Amount", align: "right" },
       ],
       rows: filtered.map((e: any) => ({
@@ -141,6 +142,7 @@ function ExpensesPage() {
         type: e.type === "salary" ? "Salary" : "General",
         ref: e.type === "salary" ? e.employees?.name ?? "—" : e.expense_categories?.name ?? "—",
         desc: e.description ?? "",
+        vault: e.vault_users?.name ?? "—",
         amount: formatCurrency(e.amount),
       })),
       summary: [
