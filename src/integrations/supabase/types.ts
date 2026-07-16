@@ -159,6 +159,7 @@ export type Database = {
           salary_month: string | null
           type: string
           updated_at: string
+          vault_user_id: string | null
         }
         Insert: {
           amount?: number
@@ -172,6 +173,7 @@ export type Database = {
           salary_month?: string | null
           type?: string
           updated_at?: string
+          vault_user_id?: string | null
         }
         Update: {
           amount?: number
@@ -185,6 +187,7 @@ export type Database = {
           salary_month?: string | null
           type?: string
           updated_at?: string
+          vault_user_id?: string | null
         }
         Relationships: [
           {
@@ -199,6 +202,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
             referencedColumns: ["id"]
           },
         ]
@@ -391,6 +401,7 @@ export type Database = {
           purchase_date: string
           reference_no: string
           supplier_id: string | null
+          vault_user_id: string | null
         }
         Insert: {
           amount_paid?: number
@@ -403,6 +414,7 @@ export type Database = {
           purchase_date?: string
           reference_no?: string
           supplier_id?: string | null
+          vault_user_id?: string | null
         }
         Update: {
           amount_paid?: number
@@ -415,6 +427,7 @@ export type Database = {
           purchase_date?: string
           reference_no?: string
           supplier_id?: string | null
+          vault_user_id?: string | null
         }
         Relationships: [
           {
@@ -422,6 +435,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
             referencedColumns: ["id"]
           },
         ]
@@ -715,6 +735,80 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vault_topups: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          topup_date: string
+          updated_at: string
+          vault_user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          topup_date?: string
+          updated_at?: string
+          vault_user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          topup_date?: string
+          updated_at?: string
+          vault_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_topups_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_users: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          opening_balance: number
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          opening_balance?: number
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          opening_balance?: number
+          phone?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

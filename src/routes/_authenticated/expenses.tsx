@@ -34,13 +34,19 @@ function ExpensesPage() {
   const [catOpen, setCatOpen] = useState(false);
   const [toDelete, setToDelete] = useState<any>(null);
 
-  const [gen, setGen] = useState({ expense_date: today(), category_id: "", amount: 0, description: "" });
-  const [sal, setSal] = useState({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "" });
+  const [gen, setGen] = useState({ expense_date: today(), category_id: "", amount: 0, description: "", vault_user_id: "" });
+  const [sal, setSal] = useState({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "", vault_user_id: "" });
   const [catName, setCatName] = useState("");
+  const [vaultFilter, setVaultFilter] = useState<string>("all");
 
   const { data: cats } = useQuery({
     queryKey: ["expense_categories"],
     queryFn: async () => (await supabase.from("expense_categories").select("*").order("name")).data ?? [],
+  });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
   const { data: employees } = useQuery({
     queryKey: ["employees-active"],
@@ -51,12 +57,15 @@ function ExpensesPage() {
     queryFn: async () =>
       (await supabase
         .from("expenses")
-        .select("*, expense_categories(name), employees(name)")
+        .select("*, expense_categories(name), employees(name), vault_users(name)")
         .order("expense_date", { ascending: false })).data ?? [],
   });
 
   const inRange = (e: any) => e.expense_date >= from && e.expense_date <= to;
-  const filtered = useMemo(() => (expenses ?? []).filter(inRange), [expenses, from, to]);
+  const filtered = useMemo(
+    () => (expenses ?? []).filter((e: any) => inRange(e) && (vaultFilter === "all" ? true : vaultFilter === "none" ? !e.vault_user_id : e.vault_user_id === vaultFilter)),
+    [expenses, from, to, vaultFilter],
+  );
   const general = filtered.filter((e: any) => e.type === "general");
   const salaries = filtered.filter((e: any) => e.type === "salary");
   const totalGeneral = general.reduce((s: number, e: any) => s + Number(e.amount), 0);
@@ -69,10 +78,11 @@ function ExpensesPage() {
       const { error } = await supabase.from("expenses").insert({
         type: "general", expense_date: gen.expense_date, category_id: gen.category_id || null,
         amount: Number(gen.amount), description: gen.description || null, created_by: u.user?.id ?? null,
+        vault_user_id: gen.vault_user_id || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expenses"] }); setGenOpen(false); toast.success("Expense added"); },
+    onSuccess: () => { qc.invalidateQueries(); setGenOpen(false); toast.success("Expense added"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -85,10 +95,11 @@ function ExpensesPage() {
         type: "salary", expense_date: sal.expense_date, employee_id: sal.employee_id,
         salary_month: sal.salary_month, amount: Number(sal.amount), description: sal.description || null,
         created_by: u.user?.id ?? null,
+        vault_user_id: sal.vault_user_id || null,
       });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expenses"] }); setSalOpen(false); toast.success("Salary recorded"); },
+    onSuccess: () => { qc.invalidateQueries(); setSalOpen(false); toast.success("Salary recorded"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -111,8 +122,8 @@ function ExpensesPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const openGeneral = () => { setGen({ expense_date: today(), category_id: "", amount: 0, description: "" }); setGenOpen(true); };
-  const openSalary = () => { setSal({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "" }); setSalOpen(true); };
+  const openGeneral = () => { setGen({ expense_date: today(), category_id: "", amount: 0, description: "", vault_user_id: "" }); setGenOpen(true); };
+  const openSalary = () => { setSal({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "", vault_user_id: "" }); setSalOpen(true); };
 
   const printExpenses = () => {
     printReport({
@@ -123,6 +134,7 @@ function ExpensesPage() {
         { key: "type", label: "Type" },
         { key: "ref", label: "Category / Employee" },
         { key: "desc", label: "Description" },
+        { key: "vault", label: "Vault User" },
         { key: "amount", label: "Amount", align: "right" },
       ],
       rows: filtered.map((e: any) => ({
@@ -130,6 +142,7 @@ function ExpensesPage() {
         type: e.type === "salary" ? "Salary" : "General",
         ref: e.type === "salary" ? e.employees?.name ?? "—" : e.expense_categories?.name ?? "—",
         desc: e.description ?? "",
+        vault: e.vault_users?.name ?? "—",
         amount: formatCurrency(e.amount),
       })),
       summary: [
@@ -151,6 +164,17 @@ function ExpensesPage() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div><Label className="text-xs text-muted-foreground">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
         <div><Label className="text-xs text-muted-foreground">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+        <div className="min-w-[180px]">
+          <Label className="text-xs text-muted-foreground">By Vault User</Label>
+          <Select value={vaultFilter} onValueChange={setVaultFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="none">No vault user</SelectItem>
+              {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -173,13 +197,14 @@ function ExpensesPage() {
               <div className="py-12 text-center text-muted-foreground">No general expenses in this range.</div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead>Vault User</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {general.map((e: any) => (
                     <TableRow key={e.id}>
                       <TableCell>{formatDate(e.expense_date)}</TableCell>
                       <TableCell>{e.expense_categories?.name ?? "-"}</TableCell>
                       <TableCell>{e.description ?? "-"}</TableCell>
+                      <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
                       <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
@@ -197,7 +222,7 @@ function ExpensesPage() {
               <div className="py-12 text-center text-muted-foreground">No salary payments in this range.</div>
             ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Month</TableHead><TableHead>Note</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Month</TableHead><TableHead>Note</TableHead><TableHead>Vault User</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {salaries.map((e: any) => (
                     <TableRow key={e.id}>
@@ -205,6 +230,7 @@ function ExpensesPage() {
                       <TableCell className="font-medium">{e.employees?.name ?? "-"}</TableCell>
                       <TableCell>{e.salary_month ?? "-"}</TableCell>
                       <TableCell>{e.description ?? "-"}</TableCell>
+                      <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
                       <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
@@ -243,6 +269,13 @@ function ExpensesPage() {
             </div>
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={gen.amount} onChange={(e) => setGen({ ...gen, amount: +e.target.value })} /></div>
             <div className="space-y-2"><Label>Description</Label><Input value={gen.description} onChange={(e) => setGen({ ...gen, description: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={gen.vault_user_id} onValueChange={(v) => setGen({ ...gen, vault_user_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setGenOpen(false)}>Cancel</Button><Button onClick={() => addGeneral.mutate()} disabled={addGeneral.isPending}>Save</Button></DialogFooter>
         </DialogContent>
@@ -269,6 +302,13 @@ function ExpensesPage() {
             </div>
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={sal.amount} onChange={(e) => setSal({ ...sal, amount: +e.target.value })} /></div>
             <div className="space-y-2"><Label>Note</Label><Input value={sal.description} onChange={(e) => setSal({ ...sal, description: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={sal.vault_user_id} onValueChange={(v) => setSal({ ...sal, vault_user_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setSalOpen(false)}>Cancel</Button><Button onClick={() => addSalary.mutate()} disabled={addSalary.isPending}>Save</Button></DialogFooter>
         </DialogContent>

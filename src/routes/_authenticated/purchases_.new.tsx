@@ -31,10 +31,16 @@ function NewPurchase() {
   const [pickProduct, setPickProduct] = useState("");
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [payMethod, setPayMethod] = useState<string>("cash");
+  const [vaultUserId, setVaultUserId] = useState<string>("");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+  });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
   const { data: products } = useQuery({
     queryKey: ["products-min"],
@@ -64,7 +70,7 @@ function NewPurchase() {
       const paidNow = Math.max(0, Math.min(Number(amountPaid) || 0, grandTotal));
       const { data: purchase, error: pErr } = await supabase
         .from("purchases")
-        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null, amount_paid: paidNow } as any)
+        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null, amount_paid: paidNow, vault_user_id: vaultUserId || null } as any)
         .select("id").single();
       if (pErr) throw pErr;
       const items = lines.map((l) => ({
@@ -171,6 +177,20 @@ function NewPurchase() {
                 </Select>
               </div>
             )}
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={vaultUserId} onValueChange={setVaultUserId}>
+                <SelectTrigger><SelectValue placeholder="Optional — track who paid cash" /></SelectTrigger>
+                <SelectContent>
+                  {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {vaultUserId && (
+                <p className="text-xs text-muted-foreground">
+                  The paid amount will be deducted from this vault user's balance.
+                </p>
+              )}
+            </div>
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Purchase
             </Button>

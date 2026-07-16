@@ -15,6 +15,7 @@ import {
   Users,
   Settings,
   Truck,
+  Vault,
 } from "lucide-react";
 import {
   Sidebar,
@@ -43,6 +44,7 @@ const mainItems = [
 const catalogItems = [
   { title: "Restaurants", url: "/restaurants", icon: Store },
   { title: "Suppliers", url: "/suppliers", icon: Truck },
+  { title: "Vault Users", url: "/vault", icon: Vault },
   { title: "Products", url: "/products", icon: Package },
   { title: "Categories", url: "/categories", icon: Tags },
   { title: "Employees", url: "/employees", icon: Users },

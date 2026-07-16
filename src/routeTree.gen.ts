@@ -13,6 +13,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedVaultRouteImport } from './routes/_authenticated/vault'
 import { Route as AuthenticatedSuppliersRouteImport } from './routes/_authenticated/suppliers'
 import { Route as AuthenticatedStockRouteImport } from './routes/_authenticated/stock'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedExpensesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEmployeesRouteImport } from './routes/_authenticated/employees'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCategoriesRouteImport } from './routes/_authenticated/categories'
+import { Route as AuthenticatedVaultIdRouteImport } from './routes/_authenticated/vault_.$id'
 import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenticated/suppliers_.$id'
 import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
@@ -49,6 +51,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedVaultRoute = AuthenticatedVaultRouteImport.update({
+  id: '/vault',
+  path: '/vault',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSuppliersRoute = AuthenticatedSuppliersRouteImport.update({
   id: '/suppliers',
@@ -116,6 +123,11 @@ const AuthenticatedCategoriesRoute = AuthenticatedCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVaultIdRoute = AuthenticatedVaultIdRouteImport.update({
+  id: '/vault_/$id',
+  path: '/vault/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSuppliersIdRoute =
   AuthenticatedSuppliersIdRouteImport.update({
     id: '/suppliers_/$id',
@@ -157,10 +169,12 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock': typeof AuthenticatedStockRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
+  '/vault': typeof AuthenticatedVaultRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/vault/$id': typeof AuthenticatedVaultIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -179,10 +193,12 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/stock': typeof AuthenticatedStockRoute
   '/suppliers': typeof AuthenticatedSuppliersRoute
+  '/vault': typeof AuthenticatedVaultRoute
   '/purchases/new': typeof AuthenticatedPurchasesNewRoute
   '/restaurants/$id': typeof AuthenticatedRestaurantsIdRoute
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
+  '/vault/$id': typeof AuthenticatedVaultIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -203,10 +219,12 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/stock': typeof AuthenticatedStockRoute
   '/_authenticated/suppliers': typeof AuthenticatedSuppliersRoute
+  '/_authenticated/vault': typeof AuthenticatedVaultRoute
   '/_authenticated/purchases_/new': typeof AuthenticatedPurchasesNewRoute
   '/_authenticated/restaurants_/$id': typeof AuthenticatedRestaurantsIdRoute
   '/_authenticated/sales_/new': typeof AuthenticatedSalesNewRoute
   '/_authenticated/suppliers_/$id': typeof AuthenticatedSuppliersIdRoute
+  '/_authenticated/vault_/$id': typeof AuthenticatedVaultIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -227,10 +245,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stock'
     | '/suppliers'
+    | '/vault'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
     | '/suppliers/$id'
+    | '/vault/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -249,10 +269,12 @@ export interface FileRouteTypes {
     | '/settings'
     | '/stock'
     | '/suppliers'
+    | '/vault'
     | '/purchases/new'
     | '/restaurants/$id'
     | '/sales/new'
     | '/suppliers/$id'
+    | '/vault/$id'
   id:
     | '__root__'
     | '/'
@@ -272,10 +294,12 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/stock'
     | '/_authenticated/suppliers'
+    | '/_authenticated/vault'
     | '/_authenticated/purchases_/new'
     | '/_authenticated/restaurants_/$id'
     | '/_authenticated/sales_/new'
     | '/_authenticated/suppliers_/$id'
+    | '/_authenticated/vault_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,6 +338,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/vault': {
+      id: '/_authenticated/vault'
+      path: '/vault'
+      fullPath: '/vault'
+      preLoaderRoute: typeof AuthenticatedVaultRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/suppliers': {
       id: '/_authenticated/suppliers'
@@ -406,6 +437,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCategoriesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/vault_/$id': {
+      id: '/_authenticated/vault_/$id'
+      path: '/vault/$id'
+      fullPath: '/vault/$id'
+      preLoaderRoute: typeof AuthenticatedVaultIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/suppliers_/$id': {
       id: '/_authenticated/suppliers_/$id'
       path: '/suppliers/$id'
@@ -451,10 +489,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedStockRoute: typeof AuthenticatedStockRoute
   AuthenticatedSuppliersRoute: typeof AuthenticatedSuppliersRoute
+  AuthenticatedVaultRoute: typeof AuthenticatedVaultRoute
   AuthenticatedPurchasesNewRoute: typeof AuthenticatedPurchasesNewRoute
   AuthenticatedRestaurantsIdRoute: typeof AuthenticatedRestaurantsIdRoute
   AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
+  AuthenticatedVaultIdRoute: typeof AuthenticatedVaultIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -471,10 +511,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedStockRoute: AuthenticatedStockRoute,
   AuthenticatedSuppliersRoute: AuthenticatedSuppliersRoute,
+  AuthenticatedVaultRoute: AuthenticatedVaultRoute,
   AuthenticatedPurchasesNewRoute: AuthenticatedPurchasesNewRoute,
   AuthenticatedRestaurantsIdRoute: AuthenticatedRestaurantsIdRoute,
   AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
+  AuthenticatedVaultIdRoute: AuthenticatedVaultIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
