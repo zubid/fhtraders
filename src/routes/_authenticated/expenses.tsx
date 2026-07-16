@@ -267,6 +267,13 @@ function ExpensesPage() {
             </div>
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={gen.amount} onChange={(e) => setGen({ ...gen, amount: +e.target.value })} /></div>
             <div className="space-y-2"><Label>Description</Label><Input value={gen.description} onChange={(e) => setGen({ ...gen, description: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={gen.vault_user_id} onValueChange={(v) => setGen({ ...gen, vault_user_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setGenOpen(false)}>Cancel</Button><Button onClick={() => addGeneral.mutate()} disabled={addGeneral.isPending}>Save</Button></DialogFooter>
         </DialogContent>
@@ -293,6 +300,13 @@ function ExpensesPage() {
             </div>
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={sal.amount} onChange={(e) => setSal({ ...sal, amount: +e.target.value })} /></div>
             <div className="space-y-2"><Label>Note</Label><Input value={sal.description} onChange={(e) => setSal({ ...sal, description: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Paid By (Vault User)</Label>
+              <Select value={sal.vault_user_id} onValueChange={(v) => setSal({ ...sal, vault_user_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setSalOpen(false)}>Cancel</Button><Button onClick={() => addSalary.mutate()} disabled={addSalary.isPending}>Save</Button></DialogFooter>
         </DialogContent>
