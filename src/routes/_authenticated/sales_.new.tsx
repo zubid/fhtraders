@@ -24,7 +24,8 @@ function NewSale() {
   const qc = useQueryClient();
   const [restaurantId, setRestaurantId] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [discount, setDiscount] = useState(0);
+  const [discountValue, setDiscountValue] = useState(0);
+  const [discountMode, setDiscountMode] = useState<"amount" | "percent">("amount");
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
   const [received, setReceived] = useState(0);
@@ -62,6 +63,9 @@ function NewSale() {
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
 
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
+  const discount = discountMode === "percent"
+    ? Math.max(0, Math.min(100, Number(discountValue) || 0)) * subtotal / 100
+    : Math.max(0, Number(discountValue) || 0);
   const grandTotal = Math.max(0, subtotal - discount + tax);
   const hasOverstock = lines.some((l) => l.quantity > l.stock);
 
@@ -158,10 +162,23 @@ function NewSale() {
               </Select>
             </div>
             <div className="space-y-2"><Label>Sale Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2"><Label>Discount</Label><Input type="number" step="0.01" value={discount} onChange={(e) => setDiscount(+e.target.value)} /></div>
-              <div className="space-y-2"><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(+e.target.value)} /></div>
+            <div className="space-y-2">
+              <Label>Discount</Label>
+              <div className="flex gap-2">
+                <Input type="number" step="0.01" min="0" value={discountValue} onChange={(e) => setDiscountValue(+e.target.value)} />
+                <Select value={discountMode} onValueChange={(v) => setDiscountMode(v as any)}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="amount">Amount</SelectItem>
+                    <SelectItem value="percent">%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {discountMode === "percent" && subtotal > 0 && (
+                <p className="text-xs text-muted-foreground">= {formatCurrency(discount)} off {formatCurrency(subtotal)}</p>
+              )}
             </div>
+            <div className="space-y-2"><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(+e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
             <div className="space-y-2">
               <Label>Amount Received (optional)</Label>
