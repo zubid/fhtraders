@@ -32,6 +32,7 @@ import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
 import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases_.new'
+import { Route as AuthenticatedSalesEditRouteImport } from './routes/_authenticated/sales_.edit.'
 import { Route as AuthenticatedPurchasesEditRouteImport } from './routes/_authenticated/purchases_.edit.'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -152,6 +153,11 @@ const AuthenticatedPurchasesNewRoute =
     path: '/purchases/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSalesEditRoute = AuthenticatedSalesEditRouteImport.update({
+  id: '/sales_/edit/',
+  path: '/sales/edit/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPurchasesEditRoute =
   AuthenticatedPurchasesEditRouteImport.update({
     id: '/purchases_/edit/',
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
   '/purchases/edit/': typeof AuthenticatedPurchasesEditRoute
+  '/sales/edit/': typeof AuthenticatedSalesEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
   '/purchases/edit': typeof AuthenticatedPurchasesEditRoute
+  '/sales/edit': typeof AuthenticatedSalesEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -235,6 +243,7 @@ export interface FileRoutesById {
   '/_authenticated/suppliers_/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/vault_/$id': typeof AuthenticatedVaultIdRoute
   '/_authenticated/purchases_/edit/': typeof AuthenticatedPurchasesEditRoute
+  '/_authenticated/sales_/edit/': typeof AuthenticatedSalesEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/suppliers/$id'
     | '/vault/$id'
     | '/purchases/edit/'
+    | '/sales/edit/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/suppliers/$id'
     | '/vault/$id'
     | '/purchases/edit'
+    | '/sales/edit'
   id:
     | '__root__'
     | '/'
@@ -313,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/suppliers_/$id'
     | '/_authenticated/vault_/$id'
     | '/_authenticated/purchases_/edit/'
+    | '/_authenticated/sales_/edit/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -485,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/sales_/edit/': {
+      id: '/_authenticated/sales_/edit/'
+      path: '/sales/edit'
+      fullPath: '/sales/edit/'
+      preLoaderRoute: typeof AuthenticatedSalesEditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/purchases_/edit/': {
       id: '/_authenticated/purchases_/edit/'
       path: '/purchases/edit'
@@ -516,6 +535,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
   AuthenticatedVaultIdRoute: typeof AuthenticatedVaultIdRoute
   AuthenticatedPurchasesEditRoute: typeof AuthenticatedPurchasesEditRoute
+  AuthenticatedSalesEditRoute: typeof AuthenticatedSalesEditRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -539,6 +559,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
   AuthenticatedVaultIdRoute: AuthenticatedVaultIdRoute,
   AuthenticatedPurchasesEditRoute: AuthenticatedPurchasesEditRoute,
+  AuthenticatedSalesEditRoute: AuthenticatedSalesEditRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
