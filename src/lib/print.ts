@@ -42,6 +42,7 @@ function brandHeader(docTitle: string, docRef?: string, docDate?: string): strin
   const b = getBranding();
   const logo = b.logo_url ? `<img src="${esc(b.logo_url)}" alt="logo"/>` : "";
   const contactBits = [b.address, b.phone, b.email].filter(Boolean).map(esc).join(" · ");
+  const person = b.contact_person ? `<div class="biz-contact"><strong>Contact:</strong> ${esc(b.contact_person)}</div>` : "";
   return `
     <div class="brand">
       <div class="brand-left">
@@ -50,6 +51,7 @@ function brandHeader(docTitle: string, docRef?: string, docDate?: string): strin
           <p class="biz-name">${esc(b.business_name)}</p>
           <div class="biz-tag">${esc(b.business_tagline)}</div>
           ${contactBits ? `<div class="biz-contact">${contactBits}</div>` : ""}
+          ${person}
         </div>
       </div>
       <div class="doc-title">
