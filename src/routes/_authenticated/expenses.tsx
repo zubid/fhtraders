@@ -262,9 +262,15 @@ function ExpensesPage() {
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={gen.expense_date} onChange={(e) => setGen({ ...gen, expense_date: e.target.value })} /></div>
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={gen.category_id} onValueChange={(v) => setGen({ ...gen, category_id: v })}>
+              <Select value={gen.category_id} onValueChange={(v) => {
+                if (v === "__new__") { setCatOpen(true); return; }
+                setGen({ ...gen, category_id: v });
+              }}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>{(cats ?? []).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {(cats ?? []).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  <SelectItem value="__new__">+ Add new category…</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={gen.amount} onChange={(e) => setGen({ ...gen, amount: +e.target.value })} /></div>
