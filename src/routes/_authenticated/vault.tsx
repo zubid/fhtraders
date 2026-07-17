@@ -52,12 +52,25 @@ function VaultPage() {
     queryFn: async () =>
       ((await supabase.from("expenses").select("id,vault_user_id,amount,expense_date") as any).data ?? []) as any[],
   });
+  const { data: custPayments } = useQuery({
+    queryKey: ["vault_customer_payments_all"],
+    queryFn: async () =>
+      ((await (supabase.from("payments") as any).select("id,vault_user_id,amount,payment_date")).data ?? []) as any[],
+  });
+  const { data: supPayments } = useQuery({
+    queryKey: ["vault_supplier_payments_all"],
+    queryFn: async () =>
+      ((await (supabase.from("supplier_payments" as any) as any).select("id,vault_user_id,amount,payment_date,purchase_id")).data ?? []) as any[],
+  });
 
   const computeBalance = (u: any) => {
     const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
     const pSum = (purchases ?? []).filter((p: any) => p.vault_user_id === u.id).reduce((s, p: any) => s + Number(p.amount_paid ?? 0), 0);
     const eSum = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
-    return Number(u.opening_balance) + tSum - pSum - eSum;
+    const cSum = (custPayments ?? []).filter((c: any) => c.vault_user_id === u.id).reduce((s: number, c: any) => s + Number(c.amount), 0);
+    // supplier payments where vault user is set (extra pay-later payments — purchase-time payments live in purchase.amount_paid already)
+    const sPayOut = (supPayments ?? []).filter((sp: any) => sp.vault_user_id === u.id).reduce((s: number, sp: any) => s + Number(sp.amount), 0);
+    return Number(u.opening_balance) + tSum + cSum - pSum - eSum - sPayOut;
   };
 
   const totalOnHand = (users ?? []).reduce((s, u: any) => s + computeBalance(u), 0);
