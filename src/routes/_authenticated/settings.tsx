@@ -69,10 +69,10 @@ function SettingsPage() {
         invoice_footer: form.invoice_footer || "",
       };
       if (settings.id) {
-        const { error } = await supabase.from("app_settings").update(payload).eq("id", settings.id);
+        const { error } = await (supabase.from("app_settings") as any).update(payload).eq("id", settings.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("app_settings").insert(payload);
+        const { error } = await (supabase.from("app_settings") as any).insert(payload);
         if (error) throw error;
       }
     },
