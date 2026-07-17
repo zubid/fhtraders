@@ -58,8 +58,9 @@ export async function paySupplier(opts: {
   date: string;
   note?: string;
   purchaseId?: string;
+  vaultUserId?: string;
 }) {
-  const { supplierId, amount, method, date, note, purchaseId } = opts;
+  const { supplierId, amount, method, date, note, purchaseId, vaultUserId } = opts;
   if (amount <= 0) throw new Error("Amount must be greater than zero");
 
   const { data: userData } = await supabase.auth.getUser();
@@ -72,6 +73,7 @@ export async function paySupplier(opts: {
     payment_date: date,
     note: note || null,
     created_by: userData.user?.id ?? null,
+    vault_user_id: vaultUserId || null,
   });
   if (pErr) throw pErr;
 
