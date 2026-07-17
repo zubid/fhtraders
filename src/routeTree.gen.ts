@@ -32,6 +32,7 @@ import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
 import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases_.new'
+import { Route as AuthenticatedPurchasesEditRouteImport } from './routes/_authenticated/purchases_.edit.'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -151,6 +152,12 @@ const AuthenticatedPurchasesNewRoute =
     path: '/purchases/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPurchasesEditRoute =
+  AuthenticatedPurchasesEditRouteImport.update({
+    id: '/purchases_/edit/',
+    path: '/purchases/edit/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
+  '/purchases/edit/': typeof AuthenticatedPurchasesEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -199,6 +207,7 @@ export interface FileRoutesByTo {
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
+  '/purchases/edit': typeof AuthenticatedPurchasesEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -225,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/sales_/new': typeof AuthenticatedSalesNewRoute
   '/_authenticated/suppliers_/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/vault_/$id': typeof AuthenticatedVaultIdRoute
+  '/_authenticated/purchases_/edit/': typeof AuthenticatedPurchasesEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/sales/new'
     | '/suppliers/$id'
     | '/vault/$id'
+    | '/purchases/edit/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/sales/new'
     | '/suppliers/$id'
     | '/vault/$id'
+    | '/purchases/edit'
   id:
     | '__root__'
     | '/'
@@ -300,6 +312,7 @@ export interface FileRouteTypes {
     | '/_authenticated/sales_/new'
     | '/_authenticated/suppliers_/$id'
     | '/_authenticated/vault_/$id'
+    | '/_authenticated/purchases_/edit/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -472,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/purchases_/edit/': {
+      id: '/_authenticated/purchases_/edit/'
+      path: '/purchases/edit'
+      fullPath: '/purchases/edit/'
+      preLoaderRoute: typeof AuthenticatedPurchasesEditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -495,6 +515,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
   AuthenticatedVaultIdRoute: typeof AuthenticatedVaultIdRoute
+  AuthenticatedPurchasesEditRoute: typeof AuthenticatedPurchasesEditRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -517,6 +538,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
   AuthenticatedVaultIdRoute: AuthenticatedVaultIdRoute,
+  AuthenticatedPurchasesEditRoute: AuthenticatedPurchasesEditRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

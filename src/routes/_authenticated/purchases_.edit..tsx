@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/purchases_/edit/$id")({
+export const Route = createFileRoute("/_authenticated/purchases_/edit/")({
   component: EditPurchase,
 });
 
