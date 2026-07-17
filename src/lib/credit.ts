@@ -74,13 +74,14 @@ export async function recordPayment(opts: {
   date: string;
   note?: string;
   saleId?: string;
+  vaultUserId?: string;
 }) {
-  const { restaurantId, amount, method, date, note, saleId } = opts;
+  const { restaurantId, amount, method, date, note, saleId, vaultUserId } = opts;
   if (amount <= 0) throw new Error("Amount must be greater than zero");
 
   const { data: userData } = await supabase.auth.getUser();
 
-  const { error: pErr } = await supabase.from("payments").insert({
+  const { error: pErr } = await (supabase.from("payments") as any).insert({
     restaurant_id: restaurantId,
     sale_id: saleId ?? null,
     amount,
@@ -88,6 +89,7 @@ export async function recordPayment(opts: {
     payment_date: date,
     note: note || null,
     created_by: userData.user?.id ?? null,
+    vault_user_id: vaultUserId || null,
   });
   if (pErr) throw pErr;
 
