@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, Printer, HandCoins } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, HandCoins, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
@@ -122,6 +122,7 @@ function SalesPage() {
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
                         )}
                         <Button variant="ghost" size="icon" onClick={() => setView(s)}><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/sales/edit/$id" params={{ id: s.id }}><Pencil className="h-4 w-4" /></Link></Button>
                         <Button variant="ghost" size="icon" onClick={() => printInvoice(s)}><Printer className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setToDelete(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </TableCell>

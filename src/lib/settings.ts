@@ -8,6 +8,7 @@ export type Branding = {
   address: string | null;
   phone: string | null;
   email: string | null;
+  contact_person: string | null;
   currency_symbol: string;
   date_format: string;
   invoice_footer: string;
@@ -21,6 +22,7 @@ export const DEFAULT_BRANDING: Branding = {
   address: null,
   phone: null,
   email: null,
+  contact_person: null,
   currency_symbol: "PKR",
   date_format: "dd MMM yyyy",
   invoice_footer: "Thank you for your business.",

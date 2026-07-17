@@ -24,6 +24,7 @@ export const Route = createFileRoute("/_authenticated/products")({
 });
 
 const UNITS = ["kg", "g", "litre", "ml", "pcs", "box", "pack", "dozen"];
+const OTHER_UNIT = "__other__";
 
 type Product = {
   id: string; name: string; category_id: string | null; unit: string; sku: string;
@@ -216,10 +217,20 @@ function ProductsPage() {
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
-              <Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
+              <Select
+                value={UNITS.includes(form.unit) ? form.unit : OTHER_UNIT}
+                onValueChange={(v) => setForm({ ...form, unit: v === OTHER_UNIT ? "" : v })}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  <SelectItem value={OTHER_UNIT}>Other (custom)…</SelectItem>
+                </SelectContent>
               </Select>
+              {!UNITS.includes(form.unit) && (
+                <Input className="mt-2" placeholder="Type a custom unit (e.g. bottle, bag)"
+                  value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
+              )}
             </div>
             <div className="space-y-2">
               <Label>Reorder Level (low)</Label>

@@ -43,26 +43,42 @@ function VaultDetail() {
     queryFn: async () =>
       ((await supabase.from("expenses").select("id,expense_date,type,amount,description,expense_categories(name),employees(name)").eq("vault_user_id" as any, id).order("expense_date", { ascending: false }) as any).data ?? []) as any[],
   });
+  const { data: custPay } = useQuery({
+    queryKey: ["vault_cust_pay", id],
+    queryFn: async () =>
+      ((await (supabase.from("payments") as any).select("id,payment_date,amount,note,method,restaurants(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
+  });
+  const { data: supPay } = useQuery({
+    queryKey: ["vault_sup_pay", id],
+    queryFn: async () =>
+      ((await (supabase.from("supplier_payments" as any) as any).select("id,payment_date,amount,note,method,suppliers(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
+  });
 
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
   const fTop = useMemo(() => (topups ?? []).filter((t) => inRange(t.topup_date)), [topups, from, to]);
   const fPur = useMemo(() => (purchases ?? []).filter((p: any) => inRange(p.purchase_date)), [purchases, from, to]);
   const fExp = useMemo(() => (expenses ?? []).filter((e: any) => inRange(e.expense_date)), [expenses, from, to]);
+  const fCP = useMemo(() => (custPay ?? []).filter((c: any) => inRange(c.payment_date)), [custPay, from, to]);
+  const fSP = useMemo(() => (supPay ?? []).filter((s: any) => inRange(s.payment_date)), [supPay, from, to]);
 
   const sumTop = fTop.reduce((s, t) => s + Number(t.amount), 0);
   const sumPur = fPur.reduce((s: number, p: any) => s + Number(p.amount_paid ?? 0), 0);
   const sumExp = fExp.reduce((s: number, e: any) => s + Number(e.amount), 0);
+  const sumCP = fCP.reduce((s: number, c: any) => s + Number(c.amount), 0);
+  const sumSP = fSP.reduce((s: number, x: any) => s + Number(x.amount), 0);
   const opening = Number(user?.opening_balance ?? 0);
-  const balance = opening + sumTop - sumPur - sumExp;
+  const balance = opening + sumTop + sumCP - sumPur - sumExp - sumSP;
 
   const ledger = useMemo(() => {
     const rows: any[] = [];
     fTop.forEach((t) => rows.push({ date: t.topup_date, kind: "Top-up", ref: t.note ?? "-", inflow: Number(t.amount), outflow: 0 }));
+    fCP.forEach((c: any) => rows.push({ date: c.payment_date, kind: "Received", ref: c.restaurants?.name ?? c.note ?? "-", inflow: Number(c.amount), outflow: 0 }));
     fPur.forEach((p: any) => rows.push({ date: p.purchase_date, kind: "Purchase", ref: `${p.reference_no} · ${p.suppliers?.name ?? ""}`, inflow: 0, outflow: Number(p.amount_paid ?? 0) }));
+    fSP.forEach((s: any) => rows.push({ date: s.payment_date, kind: "Supplier Pay", ref: s.suppliers?.name ?? "-", inflow: 0, outflow: Number(s.amount) }));
     fExp.forEach((e: any) => rows.push({ date: e.expense_date, kind: e.type === "salary" ? "Salary" : "Expense", ref: e.type === "salary" ? (e.employees?.name ?? "-") : (e.expense_categories?.name ?? e.description ?? "-"), inflow: 0, outflow: Number(e.amount) }));
     rows.sort((a, b) => (a.date < b.date ? 1 : -1));
     return rows;
-  }, [fTop, fPur, fExp]);
+  }, [fTop, fPur, fExp, fCP, fSP]);
 
   const rangeLabel = `${from ? formatDate(from) : "start"} → ${to ? formatDate(to) : "today"}`;
 

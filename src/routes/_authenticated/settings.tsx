@@ -63,15 +63,16 @@ function SettingsPage() {
         address: form.address || null,
         phone: form.phone || null,
         email: form.email || null,
+        contact_person: form.contact_person || null,
         currency_symbol: form.currency_symbol || "PKR",
         date_format: form.date_format || "dd MMM yyyy",
         invoice_footer: form.invoice_footer || "",
       };
       if (settings.id) {
-        const { error } = await supabase.from("app_settings").update(payload).eq("id", settings.id);
+        const { error } = await (supabase.from("app_settings") as any).update(payload).eq("id", settings.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("app_settings").insert(payload);
+        const { error } = await (supabase.from("app_settings") as any).insert(payload);
         if (error) throw error;
       }
     },
@@ -198,6 +199,7 @@ function SettingsPage() {
                 <div className="space-y-2"><Label>Phone</Label><Input value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Email</Label><Input value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
                 <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Input value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <div className="space-y-2 sm:col-span-2"><Label>Contact Person (shown on invoices)</Label><Input placeholder="e.g. Imran Khan – Sales" value={form.contact_person ?? ""} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
               </div>
               <Button onClick={() => saveBranding.mutate()} disabled={saveBranding.isPending}><Save className="mr-1 h-4 w-4" />Save</Button>
             </CardContent>
