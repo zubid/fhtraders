@@ -19,6 +19,7 @@ export type Database = {
           address: string | null
           business_name: string
           business_tagline: string
+          contact_person: string | null
           created_at: string
           currency_symbol: string
           date_format: string
@@ -33,6 +34,7 @@ export type Database = {
           address?: string | null
           business_name?: string
           business_tagline?: string
+          contact_person?: string | null
           created_at?: string
           currency_symbol?: string
           date_format?: string
@@ -47,6 +49,7 @@ export type Database = {
           address?: string | null
           business_name?: string
           business_tagline?: string
+          contact_person?: string | null
           created_at?: string
           currency_symbol?: string
           date_format?: string
@@ -225,6 +228,7 @@ export type Database = {
           restaurant_id: string
           sale_id: string | null
           updated_at: string
+          vault_user_id: string | null
         }
         Insert: {
           amount: number
@@ -237,6 +241,7 @@ export type Database = {
           restaurant_id: string
           sale_id?: string | null
           updated_at?: string
+          vault_user_id?: string | null
         }
         Update: {
           amount?: number
@@ -249,6 +254,7 @@ export type Database = {
           restaurant_id?: string
           sale_id?: string | null
           updated_at?: string
+          vault_user_id?: string | null
         }
         Relationships: [
           {
@@ -263,6 +269,13 @@ export type Database = {
             columns: ["sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
             referencedColumns: ["id"]
           },
         ]
@@ -645,6 +658,7 @@ export type Database = {
           purchase_id: string | null
           supplier_id: string
           updated_at: string
+          vault_user_id: string | null
         }
         Insert: {
           amount: number
@@ -657,6 +671,7 @@ export type Database = {
           purchase_id?: string | null
           supplier_id: string
           updated_at?: string
+          vault_user_id?: string | null
         }
         Update: {
           amount?: number
@@ -669,6 +684,7 @@ export type Database = {
           purchase_id?: string | null
           supplier_id?: string
           updated_at?: string
+          vault_user_id?: string | null
         }
         Relationships: [
           {
@@ -683,6 +699,13 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payments_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
             referencedColumns: ["id"]
           },
         ]
