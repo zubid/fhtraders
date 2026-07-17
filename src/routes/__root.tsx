@@ -92,11 +92,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "Purchases, stock, restaurant accounts, sales, and profit analytics in one dashboard.",
+          "Manage purchases, inventory, restaurant accounts, multi-item sales, and profit analytics for a food distribution business.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "StockFlow — Store Management & Distribution" },
+      { name: "twitter:description", content: "Manage purchases, inventory, restaurant accounts, multi-item sales, and profit analytics for a food distribution business." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1adce051-9b48-41d4-acff-f3f8ff924e5c/id-preview-27b46e23--b2af7391-07c5-40b3-b885-8e7ac82b9e2d.lovable.app-1784272800593.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1adce051-9b48-41d4-acff-f3f8ff924e5c/id-preview-27b46e23--b2af7391-07c5-40b3-b885-8e7ac82b9e2d.lovable.app-1784272800593.png" },
     ],
     links: [
       {
