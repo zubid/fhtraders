@@ -35,6 +35,7 @@ export function PaySupplierDialog({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [target, setTarget] = useState<string>("fifo");
+  const [vaultUserId, setVaultUserId] = useState<string>("");
 
   const { data: purchases } = useQuery({
     queryKey: ["unpaid-purchases", supplierId],
@@ -48,6 +49,12 @@ export function PaySupplierDialog({
       if (error) throw error;
       return data as any[];
     },
+  });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    enabled: open,
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
 
   const outstanding = useMemo(
@@ -66,6 +73,7 @@ export function PaySupplierDialog({
       setMethod("cash");
       setNote("");
       setDate(new Date().toISOString().slice(0, 10));
+      setVaultUserId("");
     }
   }, [open, presetPurchaseId]);
 
@@ -78,6 +86,7 @@ export function PaySupplierDialog({
         date,
         note,
         purchaseId: target === "fifo" ? undefined : target,
+        vaultUserId: vaultUserId || undefined,
       });
     },
     onSuccess: () => {
@@ -137,6 +146,15 @@ export function PaySupplierDialog({
           <div className="space-y-2">
             <Label>Note</Label>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
+          </div>
+          <div className="space-y-2">
+            <Label>Paid From (Vault User)</Label>
+            <Select value={vaultUserId} onValueChange={setVaultUserId}>
+              <SelectTrigger><SelectValue placeholder="Optional — deduct from vault balance" /></SelectTrigger>
+              <SelectContent>
+                {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           {outstanding > 0 && (
             <Button type="button" variant="outline" size="sm"
