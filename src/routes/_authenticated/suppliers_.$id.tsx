@@ -289,7 +289,7 @@ const deletePayment = useMutation({
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => deletePayment.mutate(p)}
+                              onClick={() => deletePayment.mutate(p.id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
