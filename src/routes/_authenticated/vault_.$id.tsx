@@ -79,7 +79,17 @@ function VaultDetail() {
     rows.sort((a, b) => (a.date < b.date ? 1 : -1));
     return rows;
   }, [fTop, fPur, fExp, fCP, fSP]);
-
+// new addition start
+  const ledgerTotalIn = ledger.reduce(
+    (sum, row) => sum + Number(row.inflow),
+    0
+  );
+  
+  const ledgerTotalOut = ledger.reduce(
+    (sum, row) => sum + Number(row.outflow),
+    0
+  );
+  // new addition end
   const rangeLabel = `${from ? formatDate(from) : "start"} → ${to ? formatDate(to) : "today"}`;
 
   const printPdf = () => {
@@ -158,15 +168,38 @@ function VaultDetail() {
             {ledger.length === 0 ? <div className="py-10 text-center text-muted-foreground">No activity in this range.</div> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">In</TableHead><TableHead className="text-right">Out</TableHead></TableRow></TableHeader>
-                <TableBody>{ledger.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{formatDate(r.date)}</TableCell>
-                    <TableCell>{r.kind}</TableCell>
-                    <TableCell>{r.ref}</TableCell>
-                    <TableCell className="text-right text-success">{r.inflow ? formatCurrency(r.inflow) : "-"}</TableCell>
-                    <TableCell className="text-right text-destructive">{r.outflow ? formatCurrency(r.outflow) : "-"}</TableCell>
+                <TableBody>
+                  {ledger.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{formatDate(r.date)}</TableCell>
+                      <TableCell>{r.kind}</TableCell>
+                      <TableCell>{r.ref}</TableCell>
+                
+                      <TableCell className="text-right text-success">
+                        {r.inflow ? formatCurrency(r.inflow) : "-"}
+                      </TableCell>
+                
+                      <TableCell className="text-right text-destructive">
+                        {r.outflow ? formatCurrency(r.outflow) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                
+                  {/* Total Row */}
+                  <TableRow className="border-t-2 font-bold bg-muted/30">
+                    <TableCell colSpan={3} className="text-right">
+                      Total
+                    </TableCell>
+                
+                    <TableCell className="text-right text-success">
+                      {ledgerTotalIn > 0 ? formatCurrency(ledgerTotalIn) : "-"}
+                    </TableCell>
+                
+                    <TableCell className="text-right text-destructive">
+                      {formatCurrency(ledgerTotalOut)}
+                    </TableCell>
                   </TableRow>
-                ))}</TableBody>
+                </TableBody>
               </Table>
             )}
           </Card>
