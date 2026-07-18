@@ -278,13 +278,13 @@ const deletePayment = useMutation({
                           </TableCell>
                           
                           <TableCell className="text-right space-x-2">
-                            <Button
+                            {/* <Button
                               size="icon"
                               variant="ghost"
                               onClick={() => setEditingPayment(p)}
                             >
                               <Pencil className="h-4 w-4" />
-                            </Button>
+                            </Button> */}
                           
                             <Button
                               size="icon"
