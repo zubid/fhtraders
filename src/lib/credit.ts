@@ -66,7 +66,62 @@ export function distributePayment(
   return updates;
 }
 
-/** Record a payment: insert ledger row and apply it to sales (FIFO or a specific invoice). */
+/**
+ * Rebuild amount_received for every sale of a restaurant from scratch, by replaying
+ * every remaining row in the payments ledger (oldest first) through distributePayment.
+ *
+ * This is the single source of truth for sale balances. It must be called after ANY
+ * change to the payments table for a restaurant (insert, edit, or delete) so that
+ * amount_received / payment_status can never drift out of sync with the ledger —
+ * including when a payment is deleted after it had already been split across
+ * multiple invoices via FIFO.
+ */
+export async function recomputeRestaurantBalances(restaurantId: string) {
+  const { data: sales, error: sErr } = await supabase
+    .from("sales")
+    .select("id, grand_total, amount_received, sale_date, invoice_no")
+    .eq("restaurant_id", restaurantId)
+    .order("sale_date", { ascending: true });
+  if (sErr) throw sErr;
+
+  const { data: payments, error: pErr } = await supabase
+    .from("payments")
+    .select("id, amount, sale_id, payment_date, created_at")
+    .eq("restaurant_id", restaurantId)
+    .order("payment_date", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (pErr) throw pErr;
+
+  // Start every sale at zero received, then replay the ledger in chronological order.
+  const state = new Map<string, SaleBalance>(
+    (sales ?? []).map((s: any) => [s.id, { ...s, amount_received: 0 }]),
+  );
+
+  for (const p of payments ?? []) {
+    const current = Array.from(state.values());
+    const updates = distributePayment(current, Number(p.amount), p.sale_id ?? undefined);
+    for (const u of updates) {
+      const existing = state.get(u.id);
+      if (existing) existing.amount_received = u.amount_received;
+    }
+  }
+
+  // Only write rows whose value actually changed, but it's cheap/safe to just write all.
+  const original = new Map((sales ?? []).map((s: any) => [s.id, Number(s.amount_received)]));
+  const toWrite = Array.from(state.values()).filter(
+    (s) => Math.abs(Number(s.amount_received) - (original.get(s.id) ?? 0)) > 0.0001,
+  );
+
+  for (const s of toWrite) {
+    const { error } = await supabase
+      .from("sales")
+      .update({ amount_received: s.amount_received })
+      .eq("id", s.id);
+    if (error) throw error;
+  }
+}
+
+/** Record a payment: insert ledger row, then recompute balances for the restaurant. */
 export async function recordPayment(opts: {
   restaurantId: string;
   amount: number;
@@ -93,19 +148,35 @@ export async function recordPayment(opts: {
   });
   if (pErr) throw pErr;
 
-  const { data: sales, error: sErr } = await supabase
-    .from("sales")
-    .select("id, grand_total, amount_received, sale_date, invoice_no")
-    .eq("restaurant_id", restaurantId)
-    .order("sale_date", { ascending: true });
-  if (sErr) throw sErr;
+  await recomputeRestaurantBalances(restaurantId);
+}
 
-  const updates = distributePayment((sales ?? []) as SaleBalance[], amount, saleId);
-  for (const u of updates) {
-    const { error } = await supabase
-      .from("sales")
-      .update({ amount_received: u.amount_received })
-      .eq("id", u.id);
-    if (error) throw error;
+/** Delete a payment from the ledger, then recompute balances for the restaurant. */
+export async function deletePayment(paymentId: string, restaurantId: string) {
+  const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+  if (error) throw error;
+  await recomputeRestaurantBalances(restaurantId);
+}
+
+/** Edit an existing payment (amount / date / method / note / target invoice), then recompute. */
+export async function updatePayment(
+  paymentId: string,
+  restaurantId: string,
+  fields: { amount?: number; method?: string; date?: string; note?: string; saleId?: string | null },
+) {
+  if (fields.amount !== undefined && fields.amount <= 0) {
+    throw new Error("Amount must be greater than zero");
   }
+  const { error } = await supabase
+    .from("payments")
+    .update({
+      ...(fields.amount !== undefined ? { amount: fields.amount } : {}),
+      ...(fields.method !== undefined ? { method: fields.method } : {}),
+      ...(fields.date !== undefined ? { payment_date: fields.date } : {}),
+      ...(fields.note !== undefined ? { note: fields.note || null } : {}),
+      ...(fields.saleId !== undefined ? { sale_id: fields.saleId } : {}),
+    })
+    .eq("id", paymentId);
+  if (error) throw error;
+  await recomputeRestaurantBalances(restaurantId);
 }
