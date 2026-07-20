@@ -2,13 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { HandCoins, Trash2, ExternalLink } from "lucide-react";
+import { HandCoins, Trash2, Pencil, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
 import { ReceivePaymentDialog } from "@/components/app/ReceivePaymentDialog";
+import { EditPaymentDialog } from "@/components/app/EditPaymentDialog";
 import { useAuth } from "@/hooks/useAuth";
-import { saleBalance, METHOD_LABELS } from "@/lib/credit";
+import { saleBalance, deletePayment, METHOD_LABELS } from "@/lib/credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ function PaymentsPage() {
   const [restaurantFilter, setRestaurantFilter] = useState("all");
   const [payFor, setPayFor] = useState<{ id: string; name: string } | null>(null);
   const [toDelete, setToDelete] = useState<any>(null);
+  const [toEdit, setToEdit] = useState<any>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -84,11 +86,10 @@ function PaymentsPage() {
   }, [payments, restaurantFilter, from, to]);
 
   const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("payments").delete().eq("id", id);
-      if (error) throw error;
+    mutationFn: async (p: { id: string; restaurant_id: string }) => {
+      await deletePayment(p.id, p.restaurant_id);
     },
-    onSuccess: () => { qc.invalidateQueries(); setToDelete(null); toast.success("Payment deleted"); },
+    onSuccess: () => { qc.invalidateQueries(); setToDelete(null); toast.success("Payment deleted and balances updated"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -162,7 +163,12 @@ function PaymentsPage() {
                         <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>
                         <TableCell className="text-right font-medium text-success">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-right">
-                          {isAdmin && <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                          {isAdmin && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => setToEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -183,12 +189,18 @@ function PaymentsPage() {
         />
       )}
 
+      <EditPaymentDialog
+        open={!!toEdit}
+        onOpenChange={(v) => !v && setToEdit(null)}
+        payment={toEdit}
+      />
+
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={(v) => !v && setToDelete(null)}
         title="Delete payment?"
-        description="This removes the payment from the ledger. Sale balances are not automatically recalculated."
-        onConfirm={() => toDelete && del.mutate(toDelete.id)}
+        description="This removes the payment from the ledger and automatically recalculates the affected invoice balances."
+        onConfirm={() => toDelete && del.mutate({ id: toDelete.id, restaurant_id: toDelete.restaurant_id })}
       />
     </div>
   );
