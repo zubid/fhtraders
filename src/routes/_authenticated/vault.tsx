@@ -63,6 +63,17 @@ function VaultPage() {
       ((await (supabase.from("supplier_payments" as any) as any).select("id,vault_user_id,amount,payment_date,purchase_id")).data ?? []) as any[],
   });
 
+  // Purchase-time payments now create supplier_payments rows (one per vault user split).
+  // For those purchases the vault spend comes from the payment rows, so the purchase's
+  // own amount_paid must not be counted again.
+  const vaultedPurchaseIds = new Set(
+    (supPayments ?? []).filter((sp: any) => sp.vault_user_id && sp.purchase_id).map((sp: any) => sp.purchase_id),
+  );
+  const purchaseSpend = (userId: string) =>
+    (purchases ?? [])
+      .filter((p: any) => p.vault_user_id === userId && !vaultedPurchaseIds.has(p.id))
+      .reduce((s: number, p: any) => s + Number(p.amount_paid ?? 0), 0);
+
   const computeBalance = (u: any) => {
     const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
     const pSum = purchaseSpend(u.id);
@@ -123,7 +134,8 @@ function VaultPage() {
 
   const rowsForExport = (users ?? []).map((u: any) => {
     const bal = computeBalance(u);
-    const spentP = (purchases ?? []).filter((p: any) => p.vault_user_id === u.id).reduce((s, p: any) => s + Number(p.amount_paid ?? 0), 0);
+    const spentP = purchaseSpend(u.id)
+      + (supPayments ?? []).filter((sp: any) => sp.vault_user_id === u.id).reduce((s: number, sp: any) => s + Number(sp.amount), 0);
     const spentE = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
     const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
     return { u, bal, spentP, spentE, tSum };
