@@ -11,6 +11,7 @@ import { ReceivePaymentDialog } from "@/components/app/ReceivePaymentDialog";
 import { saleBalance } from "@/lib/credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { printInvoice } from "@/lib/invoice";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/sales")({
 
 function SalesPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState("all");
@@ -122,9 +124,13 @@ function SalesPage() {
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
                         )}
                         <Button variant="ghost" size="icon" onClick={() => setView(s)}><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/sales/edit/$id" params={{ id: s.id }}><Pencil className="h-4 w-4" /></Link></Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/sales/edit/$id" params={{ id: s.id }}><Pencil className="h-4 w-4" /></Link></Button>
+                        )}
                         <Button variant="ghost" size="icon" onClick={() => printInvoice(s)}><Printer className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setToDelete(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" onClick={() => setToDelete(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
