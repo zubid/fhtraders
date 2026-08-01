@@ -85,6 +85,7 @@ function VaultPage() {
 
   const totalOnHand = (users ?? []).reduce((s, u: any) => s + computeBalance(u), 0);
   const totalSpent = (users ?? []).reduce((s: number, u: any) => s + purchaseSpend(u.id), 0)
+    + (supPayments ?? []).filter((sp: any) => sp.vault_user_id).reduce((s: number, sp: any) => s + Number(sp.amount), 0)
     + (expenses ?? []).filter((e: any) => e.vault_user_id).reduce((s, e: any) => s + Number(e.amount), 0);
 
   const addUser = useMutation({

@@ -51,12 +51,25 @@ function VaultDetail() {
   const { data: supPay } = useQuery({
     queryKey: ["vault_sup_pay", id],
     queryFn: async () =>
-      ((await (supabase.from("supplier_payments" as any) as any).select("id,payment_date,amount,note,method,suppliers(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
+      ((await (supabase.from("supplier_payments" as any) as any).select("id,payment_date,amount,note,method,purchase_id,suppliers(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
   });
+  const { data: vaultedPayments } = useQuery({
+    queryKey: ["vaulted_purchase_payments"],
+    queryFn: async () =>
+      ((await (supabase.from("supplier_payments" as any) as any).select("purchase_id").not("vault_user_id", "is", null)).data ?? []) as any[],
+  });
+  const vaultedPurchaseIds = useMemo(
+    () => new Set((vaultedPayments ?? []).map((r: any) => r.purchase_id).filter(Boolean)),
+    [vaultedPayments],
+  );
 
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
   const fTop = useMemo(() => (topups ?? []).filter((t) => inRange(t.topup_date)), [topups, from, to]);
-  const fPur = useMemo(() => (purchases ?? []).filter((p: any) => inRange(p.purchase_date)), [purchases, from, to]);
+  // Purchases paid through vault payment splits are counted via those payment rows instead.
+  const fPur = useMemo(
+    () => (purchases ?? []).filter((p: any) => inRange(p.purchase_date) && !vaultedPurchaseIds.has(p.id)),
+    [purchases, from, to, vaultedPurchaseIds],
+  );
   const fExp = useMemo(() => (expenses ?? []).filter((e: any) => inRange(e.expense_date)), [expenses, from, to]);
   const fCP = useMemo(() => (custPay ?? []).filter((c: any) => inRange(c.payment_date)), [custPay, from, to]);
   const fSP = useMemo(() => (supPay ?? []).filter((s: any) => inRange(s.payment_date)), [supPay, from, to]);
