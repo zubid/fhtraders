@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app/AppSidebar";
@@ -10,15 +10,23 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
+const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault"];
+
 function AuthenticatedLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, role, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const blocked = !isAdmin && ADMIN_ONLY.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/auth", replace: true });
   }, [loading, session, navigate]);
 
-  if (loading || !session) {
+  useEffect(() => {
+    if (!loading && session && role && blocked) navigate({ to: "/stock", replace: true });
+  }, [loading, session, role, blocked, navigate]);
+
+  if (loading || !session || blocked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

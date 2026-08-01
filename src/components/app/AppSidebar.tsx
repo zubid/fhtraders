@@ -33,21 +33,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 
 const mainItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: true },
   { title: "Purchases", url: "/purchases", icon: ShoppingCart },
   { title: "Sales", url: "/sales", icon: Receipt },
-  { title: "Payments", url: "/payments", icon: HandCoins },
-  { title: "Expenses", url: "/expenses", icon: Wallet },
+  { title: "Payments", url: "/payments", icon: HandCoins, adminOnly: true },
+  { title: "Expenses", url: "/expenses", icon: Wallet, adminOnly: true },
   { title: "Stock", url: "/stock", icon: Boxes },
 ];
 
 const catalogItems = [
   { title: "Restaurants", url: "/restaurants", icon: Store },
   { title: "Suppliers", url: "/suppliers", icon: Truck },
-  { title: "Vault Users", url: "/vault", icon: Vault },
+  { title: "Vault Users", url: "/vault", icon: Vault, adminOnly: true },
   { title: "Products", url: "/products", icon: Package },
   { title: "Categories", url: "/categories", icon: Tags },
-  { title: "Employees", url: "/employees", icon: Users },
+  { title: "Employees", url: "/employees", icon: Users, adminOnly: true },
 ];
 
 const adminItems = [
@@ -60,6 +60,7 @@ export function AppSidebar() {
   const { settings } = useSettings();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (url: string) => pathname === url || pathname.startsWith(url + "/");
+  const visible = (items: { adminOnly?: boolean }[]) => items.filter((i) => isAdmin || !i.adminOnly);
 
   return (
     <Sidebar collapsible="icon">
@@ -83,7 +84,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Operations</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {visible(mainItems).map((item: any) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
                     <Link to={item.url}>
@@ -100,7 +101,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Catalog</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {catalogItems.map((item) => (
+              {visible(catalogItems).map((item: any) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
                     <Link to={item.url}>

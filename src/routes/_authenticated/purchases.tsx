@@ -11,6 +11,7 @@ import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
 import { purchaseBalance } from "@/lib/supplier-credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { printPurchase } from "@/lib/print";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/purchases")({
 
 function PurchasesPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [toDelete, setToDelete] = useState<any>(null);
@@ -127,12 +129,17 @@ function PurchasesPage() {
                     <TableCell><PaymentStatusBadge status={(p as any).payment_status ?? "unpaid"} /></TableCell>
                     <TableCell className="text-right">
                       {p.supplier_id && purchaseBalance(p as any) > 0.001 && (
+                        isAdmin &&
                         <Button variant="ghost" size="icon" title="Pay" onClick={() => setPayFor(p)}><HandCoins className="h-4 w-4" /></Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/purchases/edit/$id" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link></Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/purchases/edit/$id" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link></Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => printPurchase(p)}><Printer className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

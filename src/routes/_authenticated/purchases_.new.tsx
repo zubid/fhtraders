@@ -29,9 +29,7 @@ function NewPurchase() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [pickProduct, setPickProduct] = useState("");
-  const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<string>("cash");
-  const [vaultUserId, setVaultUserId] = useState<string>("");
+  const [splits, setSplits] = useState<{ vault_user_id: string; amount: number; method: string }[]>([]);
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -57,20 +55,34 @@ function NewPurchase() {
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
 
   const grandTotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
+  const amountPaid = splits.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const balanceDue = Math.max(0, grandTotal - amountPaid);
+
+  const addSplit = () =>
+    setSplits([...splits, { vault_user_id: "", amount: Number(balanceDue.toFixed(2)), method: "cash" }]);
+  const updateSplit = (i: number, patch: Partial<{ vault_user_id: string; amount: number; method: string }>) =>
+    setSplits(splits.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const removeSplit = (i: number) => setSplits(splits.filter((_, idx) => idx !== i));
 
   const save = useMutation({
     mutationFn: async () => {
       if (lines.length === 0) throw new Error("Add at least one product");
+      const activeSplits = splits.filter((s) => Number(s.amount) > 0);
+      const paidNow = activeSplits.reduce((s, p) => s + Number(p.amount), 0);
+      if (paidNow > grandTotal + 0.001) throw new Error("Paid amount cannot exceed the grand total");
       let sid = supplierId || null;
       if (!sid && newSupplier.trim()) {
         const { data, error } = await supabase.from("suppliers").insert({ name: newSupplier.trim() }).select("id").single();
         if (error) throw error;
         sid = data.id;
       }
-      const paidNow = Math.max(0, Math.min(Number(amountPaid) || 0, grandTotal));
+      if (paidNow > 0 && !sid) throw new Error("Select or enter a supplier to record a payment");
       const { data: purchase, error: pErr } = await supabase
         .from("purchases")
-        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null, amount_paid: paidNow, vault_user_id: vaultUserId || null } as any)
+        .insert({
+          supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null,
+          amount_paid: paidNow, vault_user_id: activeSplits.find((s) => s.vault_user_id)?.vault_user_id || null,
+        } as any)
         .select("id").single();
       if (pErr) throw pErr;
       const items = lines.map((l) => ({
@@ -79,17 +91,21 @@ function NewPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
-      if (paidNow > 0 && sid) {
+      if (activeSplits.length > 0 && sid) {
         const { data: userData } = await supabase.auth.getUser();
-        await (supabase.from("supplier_payments" as any) as any).insert({
-          supplier_id: sid,
-          purchase_id: purchase.id,
-          amount: paidNow,
-          method: payMethod,
-          payment_date: date,
-          note: "Paid at purchase",
-          created_by: userData.user?.id ?? null,
-        });
+        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any).insert(
+          activeSplits.map((s) => ({
+            supplier_id: sid,
+            purchase_id: purchase.id,
+            amount: Number(s.amount),
+            method: s.method,
+            payment_date: date,
+            note: "Paid at purchase",
+            vault_user_id: s.vault_user_id || null,
+            created_by: userData.user?.id ?? null,
+          })),
+        );
+        if (spErr) throw spErr;
       }
     },
     onSuccess: () => {
@@ -155,41 +171,45 @@ function NewPurchase() {
             <div className="flex items-center justify-between border-t border-border pt-4 text-lg font-bold">
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>
             </div>
-            <div className="space-y-2">
-              <Label>Amount Paid Now</Label>
-              <div className="flex gap-2">
-                <Input type="number" min="0" step="0.01" value={amountPaid}
-                  onChange={(e) => setAmountPaid(+e.target.value)} placeholder="0.00" />
-                <Button type="button" variant="outline" size="sm" onClick={() => setAmountPaid(Number(grandTotal.toFixed(2)))}>Full</Button>
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="flex items-center justify-between">
+                <Label>Payments (split by vault user)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addSplit}>
+                  <Plus className="mr-1 h-3.5 w-3.5" />Add
+                </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Balance: {formatCurrency(Math.max(0, grandTotal - (Number(amountPaid) || 0)))} · pay later from the Suppliers page.
-              </p>
-            </div>
-            {Number(amountPaid) > 0 && (
-              <div className="space-y-2">
-                <Label>Payment Method</Label>
-                <Select value={payMethod} onValueChange={setPayMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{METHOD_LABELS[m]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Paid By (Vault User)</Label>
-              <Select value={vaultUserId} onValueChange={setVaultUserId}>
-                <SelectTrigger><SelectValue placeholder="Optional — track who paid cash" /></SelectTrigger>
-                <SelectContent>
-                  {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {vaultUserId && (
+              {splits.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  The paid amount will be deducted from this vault user's balance.
+                  Nothing paid yet — the full amount stays as a supplier balance. Add one or more payments to split the bill
+                  between vault users (e.g. half by one, half by another).
                 </p>
               )}
+              {splits.map((s, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+                  <div className="flex items-center gap-2">
+                    <Input type="number" min="0" step="0.01" value={s.amount}
+                      onChange={(e) => updateSplit(i, { amount: +e.target.value })} placeholder="0.00" />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeSplit(i)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <Select value={s.vault_user_id} onValueChange={(v) => updateSplit(i, { vault_user_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Paid by (vault user)" /></SelectTrigger>
+                    <SelectContent>
+                      {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={s.method} onValueChange={(v) => updateSplit(i, { method: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((m) => <SelectItem key={m} value={m}>{METHOD_LABELS[m]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              <div className="flex justify-between text-sm"><span>Total Paid</span><span className="font-medium text-success">{formatCurrency(amountPaid)}</span></div>
+              <div className="flex justify-between text-sm"><span>Balance Due</span><span className="font-medium">{formatCurrency(balanceDue)}</span></div>
+              <p className="text-xs text-muted-foreground">Remaining balance can be paid later from the Suppliers page.</p>
             </div>
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Purchase

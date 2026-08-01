@@ -15,15 +15,17 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { session, signIn, loading } = useAuth();
+  const { session, signIn, loading, role } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (!loading && session) navigate({ to: "/dashboard", replace: true });
-  }, [session, loading, navigate]);
+    if (!loading && session && role) {
+      navigate({ to: role === "admin" ? "/dashboard" : "/stock", replace: true });
+    }
+  }, [session, loading, role, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,10 +33,7 @@ function AuthPage() {
     const { error } = await signIn(email, password);
     setBusy(false);
     if (error) toast.error(error);
-    else {
-      toast.success("Welcome back!");
-      navigate({ to: "/dashboard", replace: true });
-    }
+    else toast.success("Welcome back!");
   };
 
   return (
