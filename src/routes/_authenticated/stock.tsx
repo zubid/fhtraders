@@ -99,12 +99,15 @@ function StockPage() {
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
       ) : (
         <div className="space-y-4">
-          {grouped.map(([cat, { color, items }]) => (
+          {grouped.map(([cat, { color, items }]) => {
+            const catValue = items.reduce((s: number, p: any) => s + stockValue(p), 0);
+            return (
             <Card key={cat}>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />{cat}
                   <span className="text-xs font-normal text-muted-foreground">({items.length})</span>
+                  <span className="ml-auto text-sm font-semibold text-primary">{formatCurrency(catValue)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -113,6 +116,7 @@ function StockPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Product</TableHead><TableHead className="text-right">Current</TableHead>
+                        <TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Stock Value</TableHead>
                         <TableHead className="text-right">Reorder</TableHead><TableHead className="text-right">Max</TableHead>
                         <TableHead>Status</TableHead><TableHead className="text-right">Ledger</TableHead>
                       </TableRow>
@@ -122,18 +126,26 @@ function StockPage() {
                         <TableRow key={p.id}>
                           <TableCell className="font-medium">{p.name}</TableCell>
                           <TableCell className="text-right">{formatNumber(p.current_stock)} {p.unit}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(p.avg_cost)}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(stockValue(p))}</TableCell>
                           <TableCell className="text-right text-muted-foreground">{formatNumber(p.reorder_level)}</TableCell>
                           <TableCell className="text-right text-muted-foreground">{formatNumber(p.max_stock_level)}</TableCell>
                           <TableCell><StockBadge current={p.current_stock} reorder={p.reorder_level} max={p.max_stock_level} /></TableCell>
                           <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setLedgerProduct(p)}><History className="h-4 w-4" /></Button></TableCell>
                         </TableRow>
                       ))}
+                      <TableRow className="bg-muted/30 font-semibold">
+                        <TableCell colSpan={3} className="text-right">Category Total</TableCell>
+                        <TableCell className="text-right text-primary">{formatCurrency(catValue)}</TableCell>
+                        <TableCell colSpan={4} />
+                      </TableRow>
                     </TableBody>
                   </Table>
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
