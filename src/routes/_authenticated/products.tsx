@@ -2,12 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Search, ArrowUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, ArrowUpDown, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
 import { StockBadge } from "@/components/app/StockBadge";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import { printCatalog } from "@/lib/print";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,10 +41,12 @@ const emptyForm = {
 
 function ProductsPage() {
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [sortKey, setSortKey] = useState<"name" | "current_stock">("name");
   const [open, setOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -133,12 +137,33 @@ function ProductsPage() {
     setOpen(true);
   };
 
+  const buildCatalog = (showPrices: boolean) => {
+    const map = new Map<string, { name: string; color: string; items: any[] }>();
+    [...(data ?? [])]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((p) => {
+        const name = p.categories?.name ?? "Other Items";
+        if (!map.has(name)) map.set(name, { name, color: p.categories?.color ?? "#0f766e", items: [] });
+        map.get(name)!.items.push({ name: p.name, unit: p.unit, price: p.default_selling_price });
+      });
+    printCatalog([...map.values()].sort((a, b) => a.name.localeCompare(b.name)), {
+      showPrices,
+      note: "Prices are indicative and subject to change. Please contact us for bulk quotations and daily rates.",
+    });
+    setCatalogOpen(false);
+  };
+
   return (
     <div>
       <PageHeader
         title="Products"
         description="Manage your product catalog and stock levels"
-        actions={<Button onClick={openNew}><Plus className="mr-1 h-4 w-4" />New Product</Button>}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCatalogOpen(true)}><BookOpen className="mr-1 h-4 w-4" />Catalog</Button>
+            <Button onClick={openNew}><Plus className="mr-1 h-4 w-4" />New Product</Button>
+          </div>
+        }
       />
       <Card className="p-4">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
@@ -183,8 +208,14 @@ function ProductsPage() {
                     <TableCell className="text-right">{formatNumber(p.current_stock)} {p.unit}</TableCell>
                     <TableCell><StockBadge current={p.current_stock} reorder={p.reorder_level} max={p.max_stock_level} /></TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      {isAdmin ? (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -255,6 +286,21 @@ function ProductsPage() {
         description={`This will remove "${toDelete?.name}".`}
         onConfirm={() => toDelete && del.mutate(toDelete.id)}
       />
+
+      <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download Product Catalog</DialogTitle>
+            <DialogDescription>
+              A classic, branded catalog of all products grouped by category — ready to share with customers.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            <Button onClick={() => buildCatalog(true)}>Catalog with prices</Button>
+            <Button variant="outline" onClick={() => buildCatalog(false)}>Catalog without prices</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
