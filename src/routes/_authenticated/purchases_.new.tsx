@@ -29,9 +29,7 @@ function NewPurchase() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [pickProduct, setPickProduct] = useState("");
-  const [amountPaid, setAmountPaid] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<string>("cash");
-  const [vaultUserId, setVaultUserId] = useState<string>("");
+  const [splits, setSplits] = useState<{ vault_user_id: string; amount: number; method: string }[]>([]);
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -57,20 +55,34 @@ function NewPurchase() {
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
 
   const grandTotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
+  const amountPaid = splits.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const balanceDue = Math.max(0, grandTotal - amountPaid);
+
+  const addSplit = () =>
+    setSplits([...splits, { vault_user_id: "", amount: Number(balanceDue.toFixed(2)), method: "cash" }]);
+  const updateSplit = (i: number, patch: Partial<{ vault_user_id: string; amount: number; method: string }>) =>
+    setSplits(splits.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+  const removeSplit = (i: number) => setSplits(splits.filter((_, idx) => idx !== i));
 
   const save = useMutation({
     mutationFn: async () => {
       if (lines.length === 0) throw new Error("Add at least one product");
+      const activeSplits = splits.filter((s) => Number(s.amount) > 0);
+      const paidNow = activeSplits.reduce((s, p) => s + Number(p.amount), 0);
+      if (paidNow > grandTotal + 0.001) throw new Error("Paid amount cannot exceed the grand total");
       let sid = supplierId || null;
       if (!sid && newSupplier.trim()) {
         const { data, error } = await supabase.from("suppliers").insert({ name: newSupplier.trim() }).select("id").single();
         if (error) throw error;
         sid = data.id;
       }
-      const paidNow = Math.max(0, Math.min(Number(amountPaid) || 0, grandTotal));
+      if (paidNow > 0 && !sid) throw new Error("Select or enter a supplier to record a payment");
       const { data: purchase, error: pErr } = await supabase
         .from("purchases")
-        .insert({ supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null, amount_paid: paidNow, vault_user_id: vaultUserId || null } as any)
+        .insert({
+          supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null,
+          amount_paid: paidNow, vault_user_id: activeSplits.find((s) => s.vault_user_id)?.vault_user_id || null,
+        } as any)
         .select("id").single();
       if (pErr) throw pErr;
       const items = lines.map((l) => ({
@@ -79,17 +91,21 @@ function NewPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
-      if (paidNow > 0 && sid) {
+      if (activeSplits.length > 0 && sid) {
         const { data: userData } = await supabase.auth.getUser();
-        await (supabase.from("supplier_payments" as any) as any).insert({
-          supplier_id: sid,
-          purchase_id: purchase.id,
-          amount: paidNow,
-          method: payMethod,
-          payment_date: date,
-          note: "Paid at purchase",
-          created_by: userData.user?.id ?? null,
-        });
+        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any).insert(
+          activeSplits.map((s) => ({
+            supplier_id: sid,
+            purchase_id: purchase.id,
+            amount: Number(s.amount),
+            method: s.method,
+            payment_date: date,
+            note: "Paid at purchase",
+            vault_user_id: s.vault_user_id || null,
+            created_by: userData.user?.id ?? null,
+          })),
+        );
+        if (spErr) throw spErr;
       }
     },
     onSuccess: () => {
