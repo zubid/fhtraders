@@ -32,8 +32,8 @@ import { Route as AuthenticatedSuppliersIdRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSalesNewRouteImport } from './routes/_authenticated/sales_.new'
 import { Route as AuthenticatedRestaurantsIdRouteImport } from './routes/_authenticated/restaurants_.$id'
 import { Route as AuthenticatedPurchasesNewRouteImport } from './routes/_authenticated/purchases_.new'
-import { Route as AuthenticatedSalesEditRouteImport } from './routes/_authenticated/sales_.edit.'
-import { Route as AuthenticatedPurchasesEditRouteImport } from './routes/_authenticated/purchases_.edit.'
+import { Route as AuthenticatedSalesEditIdRouteImport } from './routes/_authenticated/sales_.edit.$id'
+import { Route as AuthenticatedPurchasesEditIdRouteImport } from './routes/_authenticated/purchases_.edit.$id'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -153,15 +153,16 @@ const AuthenticatedPurchasesNewRoute =
     path: '/purchases/new',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedSalesEditRoute = AuthenticatedSalesEditRouteImport.update({
-  id: '/sales_/edit/',
-  path: '/sales/edit/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPurchasesEditRoute =
-  AuthenticatedPurchasesEditRouteImport.update({
-    id: '/purchases_/edit/',
-    path: '/purchases/edit/',
+const AuthenticatedSalesEditIdRoute =
+  AuthenticatedSalesEditIdRouteImport.update({
+    id: '/sales_/edit/$id',
+    path: '/sales/edit/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPurchasesEditIdRoute =
+  AuthenticatedPurchasesEditIdRouteImport.update({
+    id: '/purchases_/edit/$id',
+    path: '/purchases/edit/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
@@ -188,8 +189,8 @@ export interface FileRoutesByFullPath {
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
-  '/purchases/edit/': typeof AuthenticatedPurchasesEditRoute
-  '/sales/edit/': typeof AuthenticatedSalesEditRoute
+  '/purchases/edit/$id': typeof AuthenticatedPurchasesEditIdRoute
+  '/sales/edit/$id': typeof AuthenticatedSalesEditIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -214,8 +215,8 @@ export interface FileRoutesByTo {
   '/sales/new': typeof AuthenticatedSalesNewRoute
   '/suppliers/$id': typeof AuthenticatedSuppliersIdRoute
   '/vault/$id': typeof AuthenticatedVaultIdRoute
-  '/purchases/edit': typeof AuthenticatedPurchasesEditRoute
-  '/sales/edit': typeof AuthenticatedSalesEditRoute
+  '/purchases/edit/$id': typeof AuthenticatedPurchasesEditIdRoute
+  '/sales/edit/$id': typeof AuthenticatedSalesEditIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -242,8 +243,8 @@ export interface FileRoutesById {
   '/_authenticated/sales_/new': typeof AuthenticatedSalesNewRoute
   '/_authenticated/suppliers_/$id': typeof AuthenticatedSuppliersIdRoute
   '/_authenticated/vault_/$id': typeof AuthenticatedVaultIdRoute
-  '/_authenticated/purchases_/edit/': typeof AuthenticatedPurchasesEditRoute
-  '/_authenticated/sales_/edit/': typeof AuthenticatedSalesEditRoute
+  '/_authenticated/purchases_/edit/$id': typeof AuthenticatedPurchasesEditIdRoute
+  '/_authenticated/sales_/edit/$id': typeof AuthenticatedSalesEditIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -270,8 +271,8 @@ export interface FileRouteTypes {
     | '/sales/new'
     | '/suppliers/$id'
     | '/vault/$id'
-    | '/purchases/edit/'
-    | '/sales/edit/'
+    | '/purchases/edit/$id'
+    | '/sales/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -296,8 +297,8 @@ export interface FileRouteTypes {
     | '/sales/new'
     | '/suppliers/$id'
     | '/vault/$id'
-    | '/purchases/edit'
-    | '/sales/edit'
+    | '/purchases/edit/$id'
+    | '/sales/edit/$id'
   id:
     | '__root__'
     | '/'
@@ -323,8 +324,8 @@ export interface FileRouteTypes {
     | '/_authenticated/sales_/new'
     | '/_authenticated/suppliers_/$id'
     | '/_authenticated/vault_/$id'
-    | '/_authenticated/purchases_/edit/'
-    | '/_authenticated/sales_/edit/'
+    | '/_authenticated/purchases_/edit/$id'
+    | '/_authenticated/sales_/edit/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -497,18 +498,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPurchasesNewRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/sales_/edit/': {
-      id: '/_authenticated/sales_/edit/'
-      path: '/sales/edit'
-      fullPath: '/sales/edit/'
-      preLoaderRoute: typeof AuthenticatedSalesEditRouteImport
+    '/_authenticated/sales_/edit/$id': {
+      id: '/_authenticated/sales_/edit/$id'
+      path: '/sales/edit/$id'
+      fullPath: '/sales/edit/$id'
+      preLoaderRoute: typeof AuthenticatedSalesEditIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/purchases_/edit/': {
-      id: '/_authenticated/purchases_/edit/'
-      path: '/purchases/edit'
-      fullPath: '/purchases/edit/'
-      preLoaderRoute: typeof AuthenticatedPurchasesEditRouteImport
+    '/_authenticated/purchases_/edit/$id': {
+      id: '/_authenticated/purchases_/edit/$id'
+      path: '/purchases/edit/$id'
+      fullPath: '/purchases/edit/$id'
+      preLoaderRoute: typeof AuthenticatedPurchasesEditIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
@@ -534,8 +535,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSalesNewRoute: typeof AuthenticatedSalesNewRoute
   AuthenticatedSuppliersIdRoute: typeof AuthenticatedSuppliersIdRoute
   AuthenticatedVaultIdRoute: typeof AuthenticatedVaultIdRoute
-  AuthenticatedPurchasesEditRoute: typeof AuthenticatedPurchasesEditRoute
-  AuthenticatedSalesEditRoute: typeof AuthenticatedSalesEditRoute
+  AuthenticatedPurchasesEditIdRoute: typeof AuthenticatedPurchasesEditIdRoute
+  AuthenticatedSalesEditIdRoute: typeof AuthenticatedSalesEditIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -558,8 +559,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSalesNewRoute: AuthenticatedSalesNewRoute,
   AuthenticatedSuppliersIdRoute: AuthenticatedSuppliersIdRoute,
   AuthenticatedVaultIdRoute: AuthenticatedVaultIdRoute,
-  AuthenticatedPurchasesEditRoute: AuthenticatedPurchasesEditRoute,
-  AuthenticatedSalesEditRoute: AuthenticatedSalesEditRoute,
+  AuthenticatedPurchasesEditIdRoute: AuthenticatedPurchasesEditIdRoute,
+  AuthenticatedSalesEditIdRoute: AuthenticatedSalesEditIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -574,3 +575,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
