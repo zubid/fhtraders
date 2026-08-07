@@ -62,7 +62,7 @@ export function ProductSearchPicker({
                 </span>
               </span>
               <span className="text-xs text-muted-foreground">
-                {p.current_stock != null ? `${formatNumber(p.current_stock)} ${p.unit}` : p.unit}
+                {p.current_stock != null ? `${formatNumber(Number(p.current_stock))} ${p.unit}` : p.unit}
               </span>
             </button>
           ))}
