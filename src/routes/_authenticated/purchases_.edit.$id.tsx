@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ProductSearchPicker } from "@/components/app/ProductSearchPicker";
 
 export const Route = createFileRoute("/_authenticated/purchases_/edit/$id")({
   component: EditPurchase,
@@ -29,7 +30,6 @@ function EditPurchase() {
   const [notes, setNotes] = useState("");
   const [vaultUserId, setVaultUserId] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [pickProduct, setPickProduct] = useState("");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -40,8 +40,9 @@ function EditPurchase() {
     queryFn: async () => ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
   });
   const { data: products } = useQuery({
-    queryKey: ["products-min"],
-    queryFn: async () => (await supabase.from("products").select("id,name,unit").order("name")).data ?? [],
+    queryKey: ["products-picker"],
+    queryFn: async () =>
+      (await supabase.from("products").select("id,name,unit,sku,current_stock,categories(name)").order("name")).data ?? [],
   });
 
   const { data: purchase, isLoading } = useQuery({
@@ -67,11 +68,9 @@ function EditPurchase() {
     })));
   }, [purchase]);
 
-  const addLine = (pid: string) => {
-    const p = (products ?? []).find((x) => x.id === pid);
-    if (!p || lines.some((l) => l.product_id === pid)) return;
+  const addLine = (p: { id: string; name: string; unit: string }) => {
+    if (lines.some((l) => l.product_id === p.id)) return;
     setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0 }]);
-    setPickProduct("");
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
@@ -114,17 +113,11 @@ function EditPurchase() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Items</CardTitle></CardHeader>
           <CardContent>
-            <div className="mb-4 max-w-sm">
-              <Label className="mb-1 block">Add product</Label>
-              <Select value={pickProduct} onValueChange={addLine}>
-                <SelectTrigger><SelectValue placeholder="Select a product..." /></SelectTrigger>
-                <SelectContent>
-                  {(products ?? []).filter((p) => !lines.some((l) => l.product_id === p.id)).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ProductSearchPicker
+              products={(products ?? []) as any}
+              excludeIds={lines.map((l) => l.product_id)}
+              onSelect={addLine}
+            />
             <Table>
               <TableHeader><TableRow><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Unit Price</TableHead><TableHead className="text-right">Total</TableHead><TableHead></TableHead></TableRow></TableHeader>
               <TableBody>
