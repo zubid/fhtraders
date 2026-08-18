@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { updatePayment, PAYMENT_METHODS, METHOD_LABELS } from "@/lib/credit";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +29,7 @@ export function EditPaymentDialog({
     method: string;
     payment_date: string;
     note?: string | null;
+    vault_user_id?: string | null;
   } | null;
 }) {
   const qc = useQueryClient();
@@ -35,6 +37,16 @@ export function EditPaymentDialog({
   const [method, setMethod] = useState<string>("cash");
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
+  const [vaultUserId, setVaultUserId] = useState<string>("none");
+
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any)
+        .select("id,name")
+        .eq("is_active", true)
+        .order("name")).data ?? []) as any[],
+  });
 
   useEffect(() => {
     if (open && payment) {
@@ -42,13 +54,17 @@ export function EditPaymentDialog({
       setMethod(payment.method);
       setDate(payment.payment_date);
       setNote(payment.note ?? "");
+      setVaultUserId(payment.vault_user_id ?? "none");
     }
   }, [open, payment]);
 
   const save = useMutation({
     mutationFn: async () => {
       if (!payment) return;
-      await updatePayment(payment.id, payment.restaurant_id, { amount, method, date, note });
+      await updatePayment(payment.id, payment.restaurant_id, {
+        amount, method, date, note,
+        vaultUserId: vaultUserId === "none" ? null : vaultUserId,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries();
@@ -90,6 +106,18 @@ export function EditPaymentDialog({
           <div className="space-y-2">
             <Label>Date</Label>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Received By (Vault User)</Label>
+            <Select value={vaultUserId} onValueChange={setVaultUserId}>
+              <SelectTrigger><SelectValue placeholder="Select vault user" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No vault user</SelectItem>
+                {(vaultUsers ?? []).map((v: any) => (
+                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Note</Label>
