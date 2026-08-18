@@ -56,6 +56,16 @@ function EditPurchase() {
     },
   });
 
+  // Purchase-time payments live in supplier_payments; the vault spend is read from
+  // those rows, so changing "Paid By" must move them too.
+  const { data: paySplits } = useQuery({
+    queryKey: ["purchase-payments", id],
+    queryFn: async () =>
+      ((await (supabase.from("supplier_payments" as any) as any)
+        .select("id,amount,method,vault_user_id")
+        .eq("purchase_id", id)).data ?? []) as any[],
+  });
+
   useEffect(() => {
     if (!purchase) return;
     setSupplierId(purchase.supplier_id ?? "");
