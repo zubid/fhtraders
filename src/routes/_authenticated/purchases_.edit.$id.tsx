@@ -108,6 +108,14 @@ function EditPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
+      // Keep the payment ledger in sync: vault spending is derived from
+      // supplier_payments rows linked to this purchase.
+      if ((paySplits ?? []).length > 0) {
+        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any)
+          .update({ vault_user_id: vaultUserId || null })
+          .eq("purchase_id", id);
+        if (spErr) throw spErr;
+      }
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); navigate({ to: "/purchases" }); },
     onError: (e: Error) => toast.error(e.message),
