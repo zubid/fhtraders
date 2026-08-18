@@ -56,6 +56,16 @@ function EditPurchase() {
     },
   });
 
+  // Purchase-time payments live in supplier_payments; the vault spend is read from
+  // those rows, so changing "Paid By" must move them too.
+  const { data: paySplits } = useQuery({
+    queryKey: ["purchase-payments", id],
+    queryFn: async () =>
+      ((await (supabase.from("supplier_payments" as any) as any)
+        .select("id,amount,method,vault_user_id")
+        .eq("purchase_id", id)).data ?? []) as any[],
+  });
+
   useEffect(() => {
     if (!purchase) return;
     setSupplierId(purchase.supplier_id ?? "");
@@ -98,6 +108,18 @@ function EditPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
+      // Keep the payment ledger in sync: vault spending is derived from
+      // supplier_payments rows linked to this purchase.
+      if ((paySplits ?? []).length > 0) {
+        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any)
+          .update({
+            vault_user_id: vaultUserId || null,
+            ...(supplierId ? { supplier_id: supplierId } : {}),
+            payment_date: date,
+          })
+          .eq("purchase_id", id);
+        if (spErr) throw spErr;
+      }
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); navigate({ to: "/purchases" }); },
     onError: (e: Error) => toast.error(e.message),
@@ -157,6 +179,13 @@ function EditPurchase() {
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>
             </div>
             <p className="text-xs text-muted-foreground">Payments already recorded stay linked. Balance recalculates automatically.</p>
+            {(paySplits ?? []).length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {(paySplits ?? []).length} payment{(paySplits ?? []).length > 1 ? "s" : ""} totalling{" "}
+                {formatCurrency((paySplits ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0))} recorded for this
+                purchase — they will be reassigned to the selected vault user.
+              </p>
+            )}
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update Purchase
             </Button>
