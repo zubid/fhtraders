@@ -110,15 +110,27 @@ function EditPurchase() {
       if (iErr) throw iErr;
       // Keep the payment ledger in sync: vault spending is derived from
       // supplier_payments rows linked to this purchase.
-      if ((paySplits ?? []).length > 0) {
-        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any)
+      // Always re-read the linked payments at save time (cached data can be stale)
+      // and verify the update actually touched them (RLS can silently match 0 rows).
+      const { data: linked, error: lErr } = await (supabase.from("supplier_payments" as any) as any)
+        .select("id")
+        .eq("purchase_id", id);
+      if (lErr) throw lErr;
+      if ((linked ?? []).length > 0) {
+        const { data: updated, error: spErr } = await (supabase.from("supplier_payments" as any) as any)
           .update({
             vault_user_id: vaultUserId || null,
             ...(supplierId ? { supplier_id: supplierId } : {}),
             payment_date: date,
           })
-          .eq("purchase_id", id);
+          .eq("purchase_id", id)
+          .select("id");
         if (spErr) throw spErr;
+        if ((updated ?? []).length !== (linked ?? []).length) {
+          throw new Error(
+            "Purchase saved, but the linked vault payment rows could not be reassigned (permission denied). Ask an admin to re-save this purchase.",
+          );
+        }
       }
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); navigate({ to: "/purchases" }); },
