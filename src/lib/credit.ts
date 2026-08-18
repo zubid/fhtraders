@@ -162,7 +162,14 @@ export async function deletePayment(paymentId: string, restaurantId: string) {
 export async function updatePayment(
   paymentId: string,
   restaurantId: string,
-  fields: { amount?: number; method?: string; date?: string; note?: string; saleId?: string | null },
+  fields: {
+    amount?: number;
+    method?: string;
+    date?: string;
+    note?: string;
+    saleId?: string | null;
+    vaultUserId?: string | null;
+  },
 ) {
   if (fields.amount !== undefined && fields.amount <= 0) {
     throw new Error("Amount must be greater than zero");
@@ -175,6 +182,7 @@ export async function updatePayment(
       ...(fields.date !== undefined ? { payment_date: fields.date } : {}),
       ...(fields.note !== undefined ? { note: fields.note || null } : {}),
       ...(fields.saleId !== undefined ? { sale_id: fields.saleId } : {}),
+      ...(fields.vaultUserId !== undefined ? { vault_user_id: fields.vaultUserId || null } : {}),
     })
     .eq("id", paymentId);
   if (error) throw error;
