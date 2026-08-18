@@ -112,7 +112,11 @@ function EditPurchase() {
       // supplier_payments rows linked to this purchase.
       if ((paySplits ?? []).length > 0) {
         const { error: spErr } = await (supabase.from("supplier_payments" as any) as any)
-          .update({ vault_user_id: vaultUserId || null })
+          .update({
+            vault_user_id: vaultUserId || null,
+            ...(supplierId ? { supplier_id: supplierId } : {}),
+            payment_date: date,
+          })
           .eq("purchase_id", id);
         if (spErr) throw spErr;
       }
@@ -175,6 +179,13 @@ function EditPurchase() {
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>
             </div>
             <p className="text-xs text-muted-foreground">Payments already recorded stay linked. Balance recalculates automatically.</p>
+            {(paySplits ?? []).length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {(paySplits ?? []).length} payment{(paySplits ?? []).length > 1 ? "s" : ""} totalling{" "}
+                {formatCurrency((paySplits ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0))} recorded for this
+                purchase — they will be reassigned to the selected vault user.
+              </p>
+            )}
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update Purchase
             </Button>
