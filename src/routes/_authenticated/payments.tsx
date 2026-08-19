@@ -16,21 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/payments")({
   component: PaymentsPage,
@@ -40,8 +27,6 @@ function PaymentsPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [restaurantFilter, setRestaurantFilter] = useState("all");
-  const [vaultFilter, setVaultFilter] = useState("all");
-  const [methodFilter, setMethodFilter] = useState("all");
   const [payFor, setPayFor] = useState<{ id: string; name: string } | null>(null);
   const [toDelete, setToDelete] = useState<any>(null);
   const [toEdit, setToEdit] = useState<any>(null);
@@ -50,25 +35,13 @@ function PaymentsPage() {
 
   const { data: restaurants } = useQuery({
     queryKey: ["restaurants-min"],
-    queryFn: async () =>
-      (await supabase.from("restaurants").select("id,name").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("restaurants").select("id,name").order("name")).data ?? [],
   });
 
   const { data: sales } = useQuery({
     queryKey: ["sales-balances"],
     queryFn: async () =>
-      (await supabase.from("sales").select("id,restaurant_id,grand_total,amount_received")).data ??
-      [],
-  });
-  const { data: vaultUsers } = useQuery({
-    queryKey: ["vault_users_active"],
-    queryFn: async () =>
-      ((
-        await (supabase.from("vault_users" as any) as any)
-          .select("id,name")
-          .eq("is_active", true)
-          .order("name")
-      ).data ?? []) as any[],
+      (await supabase.from("sales").select("id,restaurant_id,grand_total,amount_received")).data ?? [],
   });
 
   const { data: payments, isLoading } = useQuery({
@@ -76,7 +49,7 @@ function PaymentsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("*, restaurants(name), sales(invoice_no), vault_users(name)")
+        .select("*, restaurants(name), sales(invoice_no)")
         .order("payment_date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -106,39 +79,17 @@ function PaymentsPage() {
 
   const filteredPayments = useMemo(() => {
     let rows = payments ?? [];
-    if (restaurantFilter !== "all")
-      rows = rows.filter((p: any) => p.restaurant_id === restaurantFilter);
-    if (vaultFilter !== "all")
-      rows = rows.filter((p: any) =>
-        vaultFilter === "none" ? !p.vault_user_id : p.vault_user_id === vaultFilter,
-      );
-    if (methodFilter !== "all") rows = rows.filter((p: any) => p.method === methodFilter);
+    if (restaurantFilter !== "all") rows = rows.filter((p: any) => p.restaurant_id === restaurantFilter);
     if (from) rows = rows.filter((p: any) => p.payment_date >= from);
     if (to) rows = rows.filter((p: any) => p.payment_date <= to);
     return rows;
-  }, [payments, restaurantFilter, vaultFilter, methodFilter, from, to]);
-
-  const vaultTotals = useMemo(
-    () =>
-      Array.from(
-        filteredPayments.reduce((m: Map<string, number>, p: any) => {
-          const name = p.vault_users?.name ?? "Missing vault";
-          m.set(name, (m.get(name) ?? 0) + Number(p.amount));
-          return m;
-        }, new Map()),
-      ).map(([name, total]) => ({ name, total })),
-    [filteredPayments],
-  );
+  }, [payments, restaurantFilter, from, to]);
 
   const del = useMutation({
     mutationFn: async (p: { id: string; restaurant_id: string }) => {
       await deletePayment(p.id, p.restaurant_id);
     },
-    onSuccess: () => {
-      qc.invalidateQueries();
-      setToDelete(null);
-      toast.success("Payment deleted and balances updated");
-    },
+    onSuccess: () => { qc.invalidateQueries(); setToDelete(null); toast.success("Payment deleted and balances updated"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -157,29 +108,13 @@ function PaymentsPage() {
               <p className="text-sm text-muted-foreground">No outstanding balances. 🎉</p>
             ) : (
               outstandingRestaurants.map((r: any) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-2"
-                >
+                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border p-2">
                   <div className="flex items-center gap-2">
-                    <Link
-                      to="/restaurants/$id"
-                      params={{ id: r.id }}
-                      className="text-sm font-medium hover:text-primary hover:underline"
-                    >
-                      {r.name}
-                    </Link>
-                    <Badge className="bg-destructive/15 text-destructive border border-destructive/30">
-                      {formatCurrency(r.balance)}
-                    </Badge>
+                    <Link to="/restaurants/$id" params={{ id: r.id }} className="text-sm font-medium hover:text-primary hover:underline">{r.name}</Link>
+                    <Badge className="bg-destructive/15 text-destructive border border-destructive/30">{formatCurrency(r.balance)}</Badge>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPayFor({ id: r.id, name: r.name })}
-                  >
-                    <HandCoins className="mr-1 h-3.5 w-3.5" />
-                    Receive
+                  <Button size="sm" variant="outline" onClick={() => setPayFor({ id: r.id, name: r.name })}>
+                    <HandCoins className="mr-1 h-3.5 w-3.5" />Receive
                   </Button>
                 </div>
               ))
@@ -188,135 +123,50 @@ function PaymentsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Payment History</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
           <CardContent>
             <div className="mb-4 flex flex-wrap items-end gap-3">
               <div className="min-w-48">
                 <label className="text-xs text-muted-foreground">Restaurant</label>
                 <Select value={restaurantFilter} onValueChange={setRestaurantFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All restaurants</SelectItem>
-                    {(restaurants ?? []).map((r: any) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
+                    {(restaurants ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="min-w-44">
-                <label className="text-xs text-muted-foreground">Vault User</label>
-                <Select value={vaultFilter} onValueChange={setVaultFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All vaults</SelectItem>
-                    <SelectItem value="none">Missing vault</SelectItem>
-                    {(vaultUsers ?? []).map((v: any) => (
-                      <SelectItem key={v.id} value={v.id}>
-                        {v.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="min-w-36">
-                <label className="text-xs text-muted-foreground">Method</label>
-                <Select value={methodFilter} onValueChange={setMethodFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All methods</SelectItem>
-                    {Object.entries(METHOD_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>
-                        {v}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">From</label>
-                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">To</label>
-                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-              </div>
-            </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {vaultTotals.map((v: any) => (
-                <Badge key={v.name} variant="outline">
-                  {v.name}: {formatCurrency(v.total)}
-                </Badge>
-              ))}
+              <div><label className="text-xs text-muted-foreground">From</label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div><label className="text-xs text-muted-foreground">To</label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
             {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
-              </div>
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
             ) : filteredPayments.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No payments recorded.
-              </div>
+              <div className="py-10 text-center text-sm text-muted-foreground">No payments recorded.</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Restaurant</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Received By Vault</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Note</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader><TableRow>
+                    <TableHead>Date</TableHead><TableHead>Restaurant</TableHead><TableHead>Invoice</TableHead>
+                    <TableHead>Method</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead>
+                  </TableRow></TableHeader>
                   <TableBody>
                     {filteredPayments.map((p: any) => (
                       <TableRow key={p.id}>
                         <TableCell>{formatDate(p.payment_date)}</TableCell>
                         <TableCell>
-                          <Link
-                            to="/restaurants/$id"
-                            params={{ id: p.restaurant_id }}
-                            className="inline-flex items-center gap-1 hover:text-primary hover:underline"
-                          >
-                            {p.restaurants?.name ?? "-"}
-                            <ExternalLink className="h-3 w-3" />
+                          <Link to="/restaurants/$id" params={{ id: p.restaurant_id }} className="inline-flex items-center gap-1 hover:text-primary hover:underline">
+                            {p.restaurants?.name ?? "-"}<ExternalLink className="h-3 w-3" />
                           </Link>
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {p.sales?.invoice_no ?? "General (FIFO)"}
-                        </TableCell>
+                        <TableCell className="font-mono text-xs">{p.sales?.invoice_no ?? "General (FIFO)"}</TableCell>
                         <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>
-                        <TableCell>
-                          {p.vault_users?.name ?? <span className="text-destructive">Missing</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-medium text-success">
-                          {formatCurrency(p.amount)}
-                        </TableCell>
-                        <TableCell className="max-w-48 truncate">{p.note ?? "-"}</TableCell>
+                        <TableCell className="text-right font-medium text-success">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-right">
                           {isAdmin && (
                             <>
-                              <Button variant="ghost" size="icon" onClick={() => setToEdit(p)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => setToEdit(p)}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </>
                           )}
                         </TableCell>
@@ -350,9 +200,7 @@ function PaymentsPage() {
         onOpenChange={(v) => !v && setToDelete(null)}
         title="Delete payment?"
         description="This removes the payment from the ledger and automatically recalculates the affected invoice balances."
-        onConfirm={() =>
-          toDelete && del.mutate({ id: toDelete.id, restaurant_id: toDelete.restaurant_id })
-        }
+        onConfirm={() => toDelete && del.mutate({ id: toDelete.id, restaurant_id: toDelete.restaurant_id })}
       />
     </div>
   );
