@@ -12,7 +12,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/vault_/$id")({
   component: VaultDetail,
@@ -26,37 +33,72 @@ function VaultDetail() {
   const { data: user } = useQuery({
     queryKey: ["vault_user", id],
     queryFn: async () =>
-      (await (supabase.from("vault_users" as any) as any).select("*").eq("id", id).maybeSingle()).data,
+      (await (supabase.from("vault_users" as any) as any).select("*").eq("id", id).maybeSingle())
+        .data,
   });
   const { data: topups } = useQuery({
     queryKey: ["vault_topups", id],
     queryFn: async () =>
-      ((await (supabase.from("vault_topups" as any) as any).select("*").eq("vault_user_id", id).order("topup_date", { ascending: false })).data ?? []) as any[],
+      ((
+        await (supabase.from("vault_topups" as any) as any)
+          .select("*")
+          .eq("vault_user_id", id)
+          .order("topup_date", { ascending: false })
+      ).data ?? []) as any[],
   });
   const { data: purchases } = useQuery({
     queryKey: ["vault_purchases", id],
     queryFn: async () =>
-      ((await supabase.from("purchases").select("id,reference_no,purchase_date,grand_total,amount_paid,suppliers(name)").eq("vault_user_id" as any, id).order("purchase_date", { ascending: false }) as any).data ?? []) as any[],
+      ((
+        (await supabase
+          .from("purchases")
+          .select("id,reference_no,purchase_date,grand_total,amount_paid,suppliers(name)")
+          .eq("vault_user_id" as any, id)
+          .order("purchase_date", { ascending: false })) as any
+      ).data ?? []) as any[],
   });
   const { data: expenses } = useQuery({
     queryKey: ["vault_expenses", id],
     queryFn: async () =>
-      ((await supabase.from("expenses").select("id,expense_date,type,amount,description,expense_categories(name),employees(name)").eq("vault_user_id" as any, id).order("expense_date", { ascending: false }) as any).data ?? []) as any[],
+      ((
+        (await supabase
+          .from("expenses")
+          .select(
+            "id,expense_date,type,amount,description,expense_categories(name),employees(name)",
+          )
+          .eq("vault_user_id" as any, id)
+          .order("expense_date", { ascending: false })) as any
+      ).data ?? []) as any[],
   });
   const { data: custPay } = useQuery({
     queryKey: ["vault_cust_pay", id],
     queryFn: async () =>
-      ((await (supabase.from("payments") as any).select("id,payment_date,amount,note,method,restaurants(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
+      ((
+        await (supabase.from("payments") as any)
+          .select("id,payment_date,amount,note,method,restaurants(name)")
+          .eq("vault_user_id", id)
+          .order("payment_date", { ascending: false })
+      ).data ?? []) as any[],
   });
   const { data: supPay } = useQuery({
     queryKey: ["vault_sup_pay", id],
     queryFn: async () =>
-      ((await (supabase.from("supplier_payments" as any) as any).select("id,payment_date,amount,note,method,purchase_id,vault_user_id,suppliers(name)").eq("vault_user_id", id).order("payment_date", { ascending: false })).data ?? []) as any[],
+      ((
+        await (supabase.from("supplier_payments" as any) as any)
+          .select("id,payment_date,amount,note,method,purchase_id,vault_user_id,suppliers(name)")
+          .eq("vault_user_id", id)
+          .eq("is_void", false)
+          .order("payment_date", { ascending: false })
+      ).data ?? []) as any[],
   });
   const { data: allVaultedPayments } = useQuery({
     queryKey: ["vaulted_purchase_payments"],
     queryFn: async () =>
-      ((await (supabase.from("supplier_payments" as any) as any).select("purchase_id,vault_user_id").not("vault_user_id", "is", null)).data ?? []) as any[],
+      ((
+        await (supabase.from("supplier_payments" as any) as any)
+          .select("purchase_id,vault_user_id")
+          .not("vault_user_id", "is", null)
+      ).data ?? []) as any[],
   });
 
   const splitPurchaseIds = useMemo(() => {
@@ -74,16 +116,22 @@ function VaultDetail() {
   }, [allVaultedPayments]);
 
   const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
-  const fTop = useMemo(() => (topups ?? []).filter((t) => inRange(t.topup_date)), [topups, from, to]);
-  const fPur = useMemo(
-    () => (purchases ?? []).filter((p: any) => inRange(p.purchase_date) && !splitPurchaseIds.has(p.id)),
-    [purchases, from, to, splitPurchaseIds],
+  const fTop = useMemo(
+    () => (topups ?? []).filter((t) => inRange(t.topup_date)),
+    [topups, from, to],
   );
-  const fExp = useMemo(() => (expenses ?? []).filter((e: any) => inRange(e.expense_date)), [expenses, from, to]);
-  const fCP = useMemo(() => (custPay ?? []).filter((c: any) => inRange(c.payment_date)), [custPay, from, to]);
+  const fPur = useMemo(() => [], []);
+  const fExp = useMemo(
+    () => (expenses ?? []).filter((e: any) => inRange(e.expense_date)),
+    [expenses, from, to],
+  );
+  const fCP = useMemo(
+    () => (custPay ?? []).filter((c: any) => inRange(c.payment_date)),
+    [custPay, from, to],
+  );
   const fSP = useMemo(
-    () => (supPay ?? []).filter((s: any) => inRange(s.payment_date) && s.purchase_id && splitPurchaseIds.has(s.purchase_id)),
-    [supPay, from, to, splitPurchaseIds],
+    () => (supPay ?? []).filter((s: any) => inRange(s.payment_date)),
+    [supPay, from, to],
   );
 
   const sumTop = fTop.reduce((s, t) => s + Number(t.amount), 0);
@@ -96,11 +144,54 @@ function VaultDetail() {
 
   const ledger = useMemo(() => {
     const rows: any[] = [];
-    fTop.forEach((t) => rows.push({ date: t.topup_date, kind: "Top-up", ref: t.note ?? "-", inflow: Number(t.amount), outflow: 0 }));
-    fCP.forEach((c: any) => rows.push({ date: c.payment_date, kind: "Restaurant Receipt", ref: c.restaurants?.name ?? c.note ?? "-", inflow: Number(c.amount), outflow: 0 }));
-    fPur.forEach((p: any) => rows.push({ date: p.purchase_date, kind: "Purchase", ref: `${p.reference_no} · ${p.suppliers?.name ?? ""}`, inflow: 0, outflow: Number(p.amount_paid ?? 0) }));
-    fSP.forEach((s: any) => rows.push({ date: s.payment_date, kind: "Purchase Split", ref: s.suppliers?.name ?? "-", inflow: 0, outflow: Number(s.amount) }));
-    fExp.forEach((e: any) => rows.push({ date: e.expense_date, kind: e.type === "salary" ? "Salary" : "Expense", ref: e.type === "salary" ? (e.employees?.name ?? "-") : (e.expense_categories?.name ?? e.description ?? "-"), inflow: 0, outflow: Number(e.amount) }));
+    fTop.forEach((t) =>
+      rows.push({
+        date: t.topup_date,
+        kind: "Top-up",
+        ref: t.note ?? "-",
+        inflow: Number(t.amount),
+        outflow: 0,
+      }),
+    );
+    fCP.forEach((c: any) =>
+      rows.push({
+        date: c.payment_date,
+        kind: "Restaurant Receipt",
+        ref: c.restaurants?.name ?? c.note ?? "-",
+        inflow: Number(c.amount),
+        outflow: 0,
+      }),
+    );
+    fPur.forEach((p: any) =>
+      rows.push({
+        date: p.purchase_date,
+        kind: "Purchase",
+        ref: `${p.reference_no} · ${p.suppliers?.name ?? ""}`,
+        inflow: 0,
+        outflow: Number(p.amount_paid ?? 0),
+      }),
+    );
+    fSP.forEach((s: any) =>
+      rows.push({
+        date: s.payment_date,
+        kind: "Purchase Split",
+        ref: s.suppliers?.name ?? "-",
+        inflow: 0,
+        outflow: Number(s.amount),
+      }),
+    );
+    fExp.forEach((e: any) =>
+      rows.push({
+        date: e.expense_date,
+        kind: e.type === "salary" ? "Salary" : "Expense",
+        ref:
+          e.type === "salary"
+            ? (e.employees?.name ?? "-")
+            : (e.expense_categories?.name ?? e.description ?? "-"),
+        inflow: 0,
+        outflow: Number(e.amount),
+      }),
+    );
     rows.sort((a, b) => (a.date < b.date ? 1 : -1));
     return rows;
   }, [fTop, fPur, fExp, fCP, fSP]);
@@ -121,7 +212,9 @@ function VaultDetail() {
         { key: "outflow", label: "Out", align: "right" },
       ],
       rows: ledger.map((r) => ({
-        date: formatDate(r.date), kind: r.kind, ref: r.ref,
+        date: formatDate(r.date),
+        kind: r.kind,
+        ref: r.ref,
         inflow: r.inflow ? formatCurrency(r.inflow) : "-",
         outflow: r.outflow ? formatCurrency(r.outflow) : "-",
       })),
@@ -147,31 +240,94 @@ function VaultDetail() {
 
   return (
     <div>
-      <Button variant="ghost" size="sm" asChild className="mb-2"><Link to="/vault"><ArrowLeft className="mr-1 h-4 w-4" />Back</Link></Button>
+      <Button variant="ghost" size="sm" asChild className="mb-2">
+        <Link to="/vault">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back
+        </Link>
+      </Button>
       <PageHeader
         title={user?.name ?? "Vault User"}
         description={user?.phone ?? user?.notes ?? "Cash ledger"}
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportExcel}><FileSpreadsheet className="mr-1 h-4 w-4" />Excel</Button>
-            <Button variant="outline" size="sm" onClick={printPdf}><Printer className="mr-1 h-4 w-4" />PDF</Button>
+            <Button variant="outline" size="sm" onClick={exportExcel}>
+              <FileSpreadsheet className="mr-1 h-4 w-4" />
+              Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={printPdf}>
+              <Printer className="mr-1 h-4 w-4" />
+              PDF
+            </Button>
           </div>
         }
       />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div><Label className="text-xs text-muted-foreground">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-        <div><Label className="text-xs text-muted-foreground">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-        {(from || to) && <Button variant="ghost" onClick={() => { setFrom(""); setTo(""); }}>Clear</Button>}
+        <div>
+          <Label className="text-xs text-muted-foreground">From</Label>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        {(from || to) && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setFrom("");
+              setTo("");
+            }}
+          >
+            Clear
+          </Button>
+        )}
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Opening</p><p className="mt-1 text-lg font-bold">{formatCurrency(opening)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Top-ups</p><p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumTop)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Restaurant Receipts</p><p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumCP)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Purchases</p><p className="mt-1 text-lg font-bold text-destructive">{formatCurrency(sumPur + sumSplitPay)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Expenses</p><p className="mt-1 text-lg font-bold text-destructive">{formatCurrency(sumExp)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Balance</p><p className={`mt-1 text-lg font-bold ${balance < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(balance)}</p></CardContent></Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Opening</p>
+            <p className="mt-1 text-lg font-bold">{formatCurrency(opening)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Top-ups</p>
+            <p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumTop)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Restaurant Receipts</p>
+            <p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumCP)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Purchases</p>
+            <p className="mt-1 text-lg font-bold text-destructive">
+              {formatCurrency(sumPur + sumSplitPay)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Expenses</p>
+            <p className="mt-1 text-lg font-bold text-destructive">{formatCurrency(sumExp)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-xs text-muted-foreground">Balance</p>
+            <p
+              className={`mt-1 text-lg font-bold ${balance < 0 ? "text-destructive" : "text-success"}`}
+            >
+              {formatCurrency(balance)}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="ledger">
@@ -185,23 +341,45 @@ function VaultDetail() {
 
         <TabsContent value="ledger">
           <Card className="p-4">
-            {ledger.length === 0 ? <div className="py-10 text-center text-muted-foreground">No activity in this range.</div> : (
+            {ledger.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">
+                No activity in this range.
+              </div>
+            ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">In</TableHead><TableHead className="text-right">Out</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">In</TableHead>
+                    <TableHead className="text-right">Out</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {ledger.map((r, i) => (
                     <TableRow key={i}>
                       <TableCell>{formatDate(r.date)}</TableCell>
                       <TableCell>{r.kind}</TableCell>
                       <TableCell>{r.ref}</TableCell>
-                      <TableCell className="text-right text-success">{r.inflow ? formatCurrency(r.inflow) : "-"}</TableCell>
-                      <TableCell className="text-right text-destructive">{r.outflow ? formatCurrency(r.outflow) : "-"}</TableCell>
+                      <TableCell className="text-right text-success">
+                        {r.inflow ? formatCurrency(r.inflow) : "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-destructive">
+                        {r.outflow ? formatCurrency(r.outflow) : "-"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-bold bg-muted/30">
-                    <TableCell colSpan={3} className="text-right">Total</TableCell>
-                    <TableCell className="text-right text-success">{ledgerTotalIn > 0 ? formatCurrency(ledgerTotalIn) : "-"}</TableCell>
-                    <TableCell className="text-right text-destructive">{formatCurrency(ledgerTotalOut)}</TableCell>
+                    <TableCell colSpan={3} className="text-right">
+                      Total
+                    </TableCell>
+                    <TableCell className="text-right text-success">
+                      {ledgerTotalIn > 0 ? formatCurrency(ledgerTotalIn) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {formatCurrency(ledgerTotalOut)}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -211,22 +389,36 @@ function VaultDetail() {
 
         <TabsContent value="purchases">
           <Card className="p-4">
-            {fPur.length === 0 && fSP.length === 0 ? <div className="py-10 text-center text-muted-foreground">No purchases.</div> : (
+            {fPur.length === 0 && fSP.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">No purchases.</div>
+            ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Paid from Vault</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">Paid from Vault</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {fPur.map((p: any) => (
                     <TableRow key={`purchase-${p.id}`}>
                       <TableCell>{formatDate(p.purchase_date)}</TableCell>
-                      <TableCell>{p.reference_no} · {p.suppliers?.name ?? "-"}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(p.amount_paid ?? 0)}</TableCell>
+                      <TableCell>
+                        {p.reference_no} · {p.suppliers?.name ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(p.amount_paid ?? 0)}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {fSP.map((s: any) => (
                     <TableRow key={`split-${s.id}`}>
                       <TableCell>{formatDate(s.payment_date)}</TableCell>
                       <TableCell>Split payment · {s.suppliers?.name ?? "-"}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(s.amount)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(s.amount)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -237,17 +429,30 @@ function VaultDetail() {
 
         <TabsContent value="receipts">
           <Card className="p-4">
-            {fCP.length === 0 ? <div className="py-10 text-center text-muted-foreground">No restaurant receipts.</div> : (
+            {fCP.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">No restaurant receipts.</div>
+            ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Restaurant</TableHead><TableHead>Method</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                <TableBody>{fCP.map((c: any) => (
-                  <TableRow key={c.id}>
-                    <TableCell>{formatDate(c.payment_date)}</TableCell>
-                    <TableCell>{c.restaurants?.name ?? c.note ?? "-"}</TableCell>
-                    <TableCell className="capitalize">{c.method ?? "-"}</TableCell>
-                    <TableCell className="text-right font-medium text-success">{formatCurrency(c.amount)}</TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Restaurant</TableHead>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
-                ))}</TableBody>
+                </TableHeader>
+                <TableBody>
+                  {fCP.map((c: any) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{formatDate(c.payment_date)}</TableCell>
+                      <TableCell>{c.restaurants?.name ?? c.note ?? "-"}</TableCell>
+                      <TableCell className="capitalize">{c.method ?? "-"}</TableCell>
+                      <TableCell className="text-right font-medium text-success">
+                        {formatCurrency(c.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
           </Card>
@@ -255,17 +460,34 @@ function VaultDetail() {
 
         <TabsContent value="expenses">
           <Card className="p-4">
-            {fExp.length === 0 ? <div className="py-10 text-center text-muted-foreground">No expenses.</div> : (
+            {fExp.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">No expenses.</div>
+            ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                <TableBody>{fExp.map((e: any) => (
-                  <TableRow key={e.id}>
-                    <TableCell>{formatDate(e.expense_date)}</TableCell>
-                    <TableCell>{e.type === "salary" ? "Salary" : "General"}</TableCell>
-                    <TableCell>{e.type === "salary" ? (e.employees?.name ?? "-") : (e.expense_categories?.name ?? e.description ?? "-")}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
-                ))}</TableBody>
+                </TableHeader>
+                <TableBody>
+                  {fExp.map((e: any) => (
+                    <TableRow key={e.id}>
+                      <TableCell>{formatDate(e.expense_date)}</TableCell>
+                      <TableCell>{e.type === "salary" ? "Salary" : "General"}</TableCell>
+                      <TableCell>
+                        {e.type === "salary"
+                          ? (e.employees?.name ?? "-")
+                          : (e.expense_categories?.name ?? e.description ?? "-")}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(e.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
           </Card>
@@ -273,16 +495,28 @@ function VaultDetail() {
 
         <TabsContent value="topups">
           <Card className="p-4">
-            {fTop.length === 0 ? <div className="py-10 text-center text-muted-foreground">No top-ups.</div> : (
+            {fTop.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">No top-ups.</div>
+            ) : (
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Note</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                <TableBody>{fTop.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell>{formatDate(t.topup_date)}</TableCell>
-                    <TableCell>{t.note ?? "-"}</TableCell>
-                    <TableCell className="text-right font-medium text-success">{formatCurrency(t.amount)}</TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
                   </TableRow>
-                ))}</TableBody>
+                </TableHeader>
+                <TableBody>
+                  {fTop.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell>{formatDate(t.topup_date)}</TableCell>
+                      <TableCell>{t.note ?? "-"}</TableCell>
+                      <TableCell className="text-right font-medium text-success">
+                        {formatCurrency(t.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
               </Table>
             )}
           </Card>
