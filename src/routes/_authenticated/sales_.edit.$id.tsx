@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2, Search, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ function EditSale() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [term, setTerm] = useState("");
+  const baseline = useRef("");
 
   const { data: restaurants } = useQuery({
     queryKey: ["restaurants-active"],
@@ -60,16 +62,15 @@ function EditSale() {
     setDiscountValue(Number(sale.discount) || 0);
     setTax(Number(sale.tax) || 0);
     setNotes(sale.notes ?? "");
-    setLines((sale.sale_items ?? []).map((it: any) => {
-      // add back the sold qty to stock so overstock check works after edit
+    const loadedLines = (sale.sale_items ?? []).map((it: any) => {
       const stock = Number(it.products?.current_stock ?? 0) + Number(it.quantity);
-      return {
-        product_id: it.product_id, name: it.products?.name ?? "", unit: it.products?.unit ?? "",
-        quantity: Number(it.quantity), unit_price: Number(it.unit_price),
-        stock, cost: Number(it.products?.avg_cost ?? 0),
-        price_mode: "amount" as const, markup_percent: 0,
-      };
-    }));
+      return { product_id: it.product_id, name: it.products?.name ?? "", unit: it.products?.unit ?? "",
+        quantity: Number(it.quantity), unit_price: Number(it.unit_price), stock,
+        cost: Number(it.products?.avg_cost ?? 0), price_mode: "amount" as const, markup_percent: 0 };
+    });
+    setLines(loadedLines);
+    baseline.current = JSON.stringify({ restaurantId: sale.restaurant_id ?? "", date: sale.sale_date,
+      discountValue: Number(sale.discount) || 0, tax: Number(sale.tax) || 0, notes: sale.notes ?? "", lines: loadedLines });
   }, [sale]);
 
   const results = !term.trim() ? [] : (products ?? [])
@@ -91,19 +92,26 @@ function EditSale() {
   }));
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
 
+  const currentSnapshot = useMemo(() => JSON.stringify({ restaurantId, date, discountValue, tax, notes, lines }), [restaurantId, date, discountValue, tax, notes, lines]);
+  const { allowNavigation } = useUnsavedChangesGuard(!!baseline.current && currentSnapshot !== baseline.current);
+
   const subtotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
   const discount = discountMode === "percent"
     ? Math.max(0, Math.min(100, Number(discountValue) || 0)) * subtotal / 100
     : Math.max(0, Number(discountValue) || 0);
   const grandTotal = Math.max(0, subtotal - discount + tax);
   const hasOverstock = lines.some((l) => l.quantity > l.stock);
+  const hasBelowCost = lines.some((l) => l.cost > 0 && l.unit_price < l.cost);
 
   const save = useMutation({
     mutationFn: async () => {
-      if (lines.length === 0) throw new Error("Add at least one product");
-      if (!restaurantId) throw new Error("Select a restaurant");
-      if (lines.some((l) => !l.unit_price || l.unit_price <= 0)) throw new Error("Enter a selling price for every item");
-      if (hasOverstock) throw new Error("One or more items exceed available stock");
+      if (!restaurantId) throw new Error("Select a restaurant before saving this sale.");
+      if (!date) throw new Error("Select a sale date before saving this sale.");
+      if (lines.length === 0) throw new Error("Add at least one product.");
+      if (lines.some((l) => l.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
+      if (lines.some((l) => l.unit_price <= 0)) throw new Error("Selling price must be greater than zero for every item.");
+      if (hasOverstock) throw new Error("One or more items exceed available stock.");
+      if (hasBelowCost) throw new Error("Selling price cannot be lower than product cost.");
       const { error: dErr } = await supabase.from("sale_items").delete().eq("sale_id", id);
       if (dErr) throw dErr;
       const { error: uErr } = await supabase.from("sales").update({
@@ -121,7 +129,7 @@ function EditSale() {
       const totalCost = (saved ?? []).reduce((s, x) => s + Number(x.quantity) * Number(x.cost_price), 0);
       await supabase.from("sales").update({ total_cost: totalCost }).eq("id", id);
     },
-    onSuccess: () => { qc.invalidateQueries(); toast.success("Sale updated"); navigate({ to: "/sales" }); },
+    onSuccess: () => { qc.invalidateQueries(); toast.success("Sale updated"); allowNavigation(); navigate({ to: "/sales" }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -154,6 +162,7 @@ function EditSale() {
               <TableBody>
                 {lines.map((l, i) => {
                   const over = l.quantity > l.stock;
+                  const belowCost = l.cost > 0 && l.unit_price < l.cost;
                   return (
                     <TableRow key={l.product_id}>
                       <TableCell className="font-medium">{l.name}<div className="text-xs text-muted-foreground">Available: {formatNumber(l.stock)} {l.unit}</div></TableCell>
@@ -164,7 +173,7 @@ function EditSale() {
                       <TableCell>
                         <div className="flex gap-1">
                           {l.price_mode === "amount" ? (
-                            <Input type="number" min="0" step="0.01" className="w-24" value={l.unit_price || ""} onChange={(e) => updateLine(i, { unit_price: +e.target.value })} />
+                            <Input type="number" min="0" step="0.01" className={`w-24 ${belowCost ? "border-destructive" : ""}`} value={l.unit_price || ""} onChange={(e) => updateLine(i, { unit_price: +e.target.value })} />
                           ) : (
                             <Input type="number" min="0" step="0.01" className="w-24" placeholder="%" value={l.markup_percent || ""} onChange={(e) => updateLine(i, { markup_percent: +e.target.value })} />
                           )}
@@ -176,7 +185,7 @@ function EditSale() {
                             </SelectContent>
                           </Select>
                         </div>
-                        {l.cost > 0 && <div className="mt-1 text-xs text-muted-foreground">Cost: {formatCurrency(l.cost)}</div>}
+                        {belowCost ? <div className="mt-1 flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3 w-3" />Below cost — minimum {formatCurrency(l.cost)}</div> : l.cost > 0 && <div className="mt-1 text-xs text-muted-foreground">Cost: {formatCurrency(l.cost)}</div>}
                       </TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(l.quantity * l.unit_price)}</TableCell>
                       <TableCell><Button variant="ghost" size="icon" onClick={() => removeLine(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
@@ -191,13 +200,13 @@ function EditSale() {
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Restaurant</Label>
+              <Label>Restaurant *</Label>
               <Select value={restaurantId} onValueChange={setRestaurantId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{(restaurants ?? []).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Sale Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Sale Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2">
               <Label>Discount</Label>
               <div className="flex gap-2">

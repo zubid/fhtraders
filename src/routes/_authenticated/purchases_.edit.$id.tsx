@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ function EditPurchase() {
   const [notes, setNotes] = useState("");
   const [vaultUserId, setVaultUserId] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
+  const baseline = useRef("");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -72,10 +74,13 @@ function EditPurchase() {
     setDate(purchase.purchase_date);
     setNotes(purchase.notes ?? "");
     setVaultUserId(purchase.vault_user_id ?? "");
-    setLines((purchase.purchase_items ?? []).map((it: any) => ({
+    const loadedLines = (purchase.purchase_items ?? []).map((it: any) => ({
       product_id: it.product_id, name: it.products?.name ?? "", unit: it.products?.unit ?? "",
       quantity: Number(it.quantity), unit_price: Number(it.unit_price),
-    })));
+    }));
+    setLines(loadedLines);
+    baseline.current = JSON.stringify({ supplierId: purchase.supplier_id ?? "", date: purchase.purchase_date,
+      notes: purchase.notes ?? "", vaultUserId: purchase.vault_user_id ?? "", lines: loadedLines });
   }, [purchase]);
 
   const addLine = (p: { id: string; name: string; unit: string }) => {
@@ -84,11 +89,18 @@ function EditPurchase() {
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
+  const currentSnapshot = useMemo(() => JSON.stringify({ supplierId, date, notes, vaultUserId, lines }), [supplierId, date, notes, vaultUserId, lines]);
+  const { allowNavigation } = useUnsavedChangesGuard(!!baseline.current && currentSnapshot !== baseline.current);
   const grandTotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
 
   const save = useMutation({
     mutationFn: async () => {
-      if (lines.length === 0) throw new Error("Add at least one product");
+      if (!supplierId) throw new Error("Select a supplier before updating this purchase.");
+      if (!date) throw new Error("Select a purchase date before updating.");
+      if (lines.length === 0) throw new Error("Add at least one product.");
+      if (lines.some((line) => line.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
+      if (lines.some((line) => line.unit_price <= 0)) throw new Error("Unit price must be greater than zero for every item.");
+      if ((paySplits ?? []).length > 0 && !vaultUserId) throw new Error("This purchase has recorded payments. Select the Vault User before updating.");
       // Reverse & delete existing items (triggers restock)
       const { error: dErr } = await supabase.from("purchase_items").delete().eq("purchase_id", id);
       if (dErr) throw dErr;
@@ -123,7 +135,7 @@ function EditPurchase() {
         throw new Error("Purchase saved, but its supplier payment ledger did not synchronize. Please retry or contact an admin.");
       }
     },
-    onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); navigate({ to: "/purchases" }); },
+    onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); allowNavigation(); navigate({ to: "/purchases" }); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -162,16 +174,16 @@ function EditPurchase() {
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Supplier</Label>
+              <Label>Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                 <SelectContent>{(suppliers ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Purchase Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
             <div className="space-y-2">
-              <Label>Paid By (Vault User)</Label>
+              <Label>Paid By (Vault User){(paySplits ?? []).length > 0 ? " *" : ""}</Label>
               <Select value={vaultUserId} onValueChange={setVaultUserId}>
                 <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                 <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
