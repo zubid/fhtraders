@@ -63,30 +63,54 @@ function VaultPage() {
       ((await (supabase.from("supplier_payments" as any) as any).select("id,vault_user_id,amount,payment_date,purchase_id")).data ?? []) as any[],
   });
 
-  // Purchase-time payments now create supplier_payments rows (one per vault user split).
-  // For those purchases the vault spend comes from the payment rows, so the purchase's
-  // own amount_paid must not be counted again.
-  const vaultedPurchaseIds = new Set(
-    (supPayments ?? []).filter((sp: any) => sp.vault_user_id && sp.purchase_id).map((sp: any) => sp.purchase_id),
-  );
+  // purchases.amount_paid already includes supplier payments applied later through FIFO/general payment.
+  // Counting those supplier_payment rows again makes the same cash-out appear twice.
+  // Only genuine multi-vault purchase splits remain authoritative through supplier_payments.
+  const splitPurchaseIds = useMemo(() => {
+    const vaultsByPurchase = new Map<string, Set<string>>();
+    for (const sp of supPayments ?? []) {
+      if (!sp.purchase_id || !sp.vault_user_id) continue;
+      if (!vaultsByPurchase.has(sp.purchase_id)) vaultsByPurchase.set(sp.purchase_id, new Set());
+      vaultsByPurchase.get(sp.purchase_id)!.add(sp.vault_user_id);
+    }
+    return new Set(
+      [...vaultsByPurchase.entries()]
+        .filter(([, vaultIds]) => vaultIds.size > 1)
+        .map(([purchaseId]) => purchaseId),
+    );
+  }, [supPayments]);
+
   const purchaseSpend = (userId: string) =>
     (purchases ?? [])
-      .filter((p: any) => p.vault_user_id === userId && !vaultedPurchaseIds.has(p.id))
+      .filter((p: any) => p.vault_user_id === userId && !splitPurchaseIds.has(p.id))
       .reduce((s: number, p: any) => s + Number(p.amount_paid ?? 0), 0);
+
+  const splitPurchaseSpend = (userId: string) =>
+    (supPayments ?? [])
+      .filter((sp: any) => sp.vault_user_id === userId && sp.purchase_id && splitPurchaseIds.has(sp.purchase_id))
+      .reduce((s: number, sp: any) => s + Number(sp.amount), 0);
+
+  const restaurantReceipts = (userId: string) =>
+    (custPayments ?? [])
+      .filter((c: any) => c.vault_user_id === userId)
+      .reduce((s: number, c: any) => s + Number(c.amount), 0);
 
   const computeBalance = (u: any) => {
     const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
-    const pSum = purchaseSpend(u.id);
+    const pSum = purchaseSpend(u.id) + splitPurchaseSpend(u.id);
     const eSum = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
-    const cSum = (custPayments ?? []).filter((c: any) => c.vault_user_id === u.id).reduce((s: number, c: any) => s + Number(c.amount), 0);
-    const sPayOut = (supPayments ?? []).filter((sp: any) => sp.vault_user_id === u.id).reduce((s: number, sp: any) => s + Number(sp.amount), 0);
-    return Number(u.opening_balance) + tSum + cSum - pSum - eSum - sPayOut;
+    const cSum = restaurantReceipts(u.id);
+    return Number(u.opening_balance) + tSum + cSum - pSum - eSum;
   };
 
   const totalOnHand = (users ?? []).reduce((s, u: any) => s + computeBalance(u), 0);
-  const totalSpent = (users ?? []).reduce((s: number, u: any) => s + purchaseSpend(u.id), 0)
-    + (supPayments ?? []).filter((sp: any) => sp.vault_user_id).reduce((s: number, sp: any) => s + Number(sp.amount), 0)
-    + (expenses ?? []).filter((e: any) => e.vault_user_id).reduce((s, e: any) => s + Number(e.amount), 0);
+  const totalReceipts = (custPayments ?? [])
+    .filter((c: any) => c.vault_user_id)
+    .reduce((s: number, c: any) => s + Number(c.amount), 0);
+  const totalSpent = (users ?? []).reduce(
+    (s: number, u: any) => s + purchaseSpend(u.id) + splitPurchaseSpend(u.id),
+    0,
+  ) + (expenses ?? []).filter((e: any) => e.vault_user_id).reduce((s, e: any) => s + Number(e.amount), 0);
 
   const addUser = useMutation({
     mutationFn: async () => {
@@ -135,11 +159,11 @@ function VaultPage() {
 
   const rowsForExport = (users ?? []).map((u: any) => {
     const bal = computeBalance(u);
-    const spentP = purchaseSpend(u.id)
-      + (supPayments ?? []).filter((sp: any) => sp.vault_user_id === u.id).reduce((s: number, sp: any) => s + Number(sp.amount), 0);
+    const spentP = purchaseSpend(u.id) + splitPurchaseSpend(u.id);
     const spentE = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
     const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
-    return { u, bal, spentP, spentE, tSum };
+    const receipts = restaurantReceipts(u.id);
+    return { u, bal, spentP, spentE, tSum, receipts };
   });
 
   const printAll = () => {
@@ -151,19 +175,22 @@ function VaultPage() {
         { key: "phone", label: "Phone" },
         { key: "opening", label: "Opening", align: "right" },
         { key: "topups", label: "Top-ups", align: "right" },
+        { key: "receipts", label: "Restaurant Receipts", align: "right" },
         { key: "purchases", label: "Purchases", align: "right" },
         { key: "expenses", label: "Expenses", align: "right" },
         { key: "balance", label: "Balance", align: "right" },
       ],
-      rows: rowsForExport.map(({ u, bal, spentP, spentE, tSum }) => ({
+      rows: rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => ({
         name: u.name, phone: u.phone ?? "-",
         opening: formatCurrency(u.opening_balance),
         topups: formatCurrency(tSum),
+        receipts: formatCurrency(receipts),
         purchases: formatCurrency(spentP),
         expenses: formatCurrency(spentE),
         balance: formatCurrency(bal),
       })),
       summary: [
+        { label: "Restaurant Receipts", value: formatCurrency(totalReceipts) },
         { label: "Total On Hand", value: formatCurrency(totalOnHand) },
         { label: "Total Spent (all vaults)", value: formatCurrency(totalSpent) },
       ],
@@ -173,10 +200,10 @@ function VaultPage() {
   const exportExcel = () => {
     downloadExcel(
       `vault-users-${today()}`,
-      ["Name", "Phone", "Opening", "Top-ups", "Purchases", "Expenses", "Balance"],
-      rowsForExport.map(({ u, bal, spentP, spentE, tSum }) => [
+      ["Name", "Phone", "Opening", "Top-ups", "Restaurant Receipts", "Purchases", "Expenses", "Balance"],
+      rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => [
         u.name, u.phone ?? "", Number(u.opening_balance).toFixed(2),
-        tSum.toFixed(2), spentP.toFixed(2), spentE.toFixed(2), bal.toFixed(2),
+        tSum.toFixed(2), receipts.toFixed(2), spentP.toFixed(2), spentE.toFixed(2), bal.toFixed(2),
       ]),
       "Vault Users",
     );
@@ -186,7 +213,7 @@ function VaultPage() {
     <div>
       <PageHeader
         title="Vault Users"
-        description="Cash holders who buy stock or pay expenses"
+        description="Cash holders who buy stock, receive restaurant cash, or pay expenses"
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={exportExcel}><FileSpreadsheet className="mr-1 h-4 w-4" />Excel</Button>
@@ -196,34 +223,37 @@ function VaultPage() {
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Vault Users</p><p className="mt-1 text-2xl font-bold">{(users ?? []).length}</p></div><Wallet className="h-8 w-8 text-primary" /></CardContent></Card>
-        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Total On Hand</p><p className="mt-1 text-2xl font-bold text-success">{formatCurrency(totalOnHand)}</p></div><HandCoins className="h-8 w-8 text-success" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Restaurant Receipts</p><p className="mt-1 text-2xl font-bold text-success">{formatCurrency(totalReceipts)}</p></div><HandCoins className="h-8 w-8 text-success" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Total On Hand</p><p className={`mt-1 text-2xl font-bold ${totalOnHand < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(totalOnHand)}</p></div><HandCoins className="h-8 w-8 text-success" /></CardContent></Card>
         <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Spent via Vault</p><p className="mt-1 text-2xl font-bold text-destructive">{formatCurrency(totalSpent)}</p></div><Wallet className="h-8 w-8 text-destructive" /></CardContent></Card>
       </div>
 
       <Card className="p-4">
         {isLoading ? <Skeleton className="h-32 w-full" /> : (users ?? []).length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">No vault users yet. Add one to start tracking cash-out.</div>
+          <div className="py-12 text-center text-muted-foreground">No vault users yet. Add one to start tracking cash.</div>
         ) : (
           <Table>
             <TableHeader><TableRow>
               <TableHead>Name</TableHead><TableHead>Phone</TableHead>
               <TableHead className="text-right">Opening</TableHead>
               <TableHead className="text-right">Top-ups</TableHead>
+              <TableHead className="text-right">Receipts</TableHead>
               <TableHead className="text-right">Spent</TableHead>
               <TableHead className="text-right">Balance</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {rowsForExport.map(({ u, bal, spentP, spentE, tSum }) => (
+              {rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name}</TableCell>
                   <TableCell>{u.phone ?? "-"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(u.opening_balance)}</TableCell>
                   <TableCell className="text-right text-success">{formatCurrency(tSum)}</TableCell>
+                  <TableCell className="text-right text-success">{formatCurrency(receipts)}</TableCell>
                   <TableCell className="text-right text-destructive">{formatCurrency(spentP + spentE)}</TableCell>
-                  <TableCell className={`text-right font-bold ${bal < 0 ? "text-destructive" : ""}`}>{formatCurrency(bal)}</TableCell>
+                  <TableCell className={`text-right font-bold ${bal < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(bal)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" title="Top-up" onClick={() => setTopOpen({ id: u.id, name: u.name })}><HandCoins className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" asChild title="Details"><Link to="/vault/$id" params={{ id: u.id }}><Eye className="h-4 w-4" /></Link></Button>
