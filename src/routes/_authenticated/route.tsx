@@ -10,23 +10,13 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const ADMIN_ONLY = [
-  "/dashboard",
-  "/reports",
-  "/reconciliation",
-  "/settings",
-  "/payments",
-  "/expenses",
-  "/employees",
-  "/vault",
-];
+const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault"];
 
 function AuthenticatedLayout() {
   const { session, loading, role, isAdmin } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const blocked =
-    !isAdmin && ADMIN_ONLY.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const blocked = !isAdmin && ADMIN_ONLY.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   useEffect(() => {
     if (!loading && !session) navigate({ to: "/auth", replace: true });

@@ -63,39 +63,33 @@ export async function paySupplier(opts: {
   const { supplierId, amount, method, date, note, purchaseId, vaultUserId } = opts;
   if (amount <= 0) throw new Error("Amount must be greater than zero");
 
-  const { error } = await (supabase.rpc as any)("save_supplier_payment", {
-    p_payment_id: null,
-    p_supplier_id: supplierId,
-    p_purchase_id: purchaseId ?? null,
-    p_amount: amount,
-    p_method: method,
-    p_payment_date: date,
-    p_note: note || null,
-    p_vault_user_id: vaultUserId || null,
-  });
-  if (error) throw error;
-}
+  const { data: userData } = await supabase.auth.getUser();
 
-export async function updateSupplierPayment(
-  paymentId: string,
-  opts: Parameters<typeof paySupplier>[0],
-) {
-  const { error } = await (supabase.rpc as any)("save_supplier_payment", {
-    p_payment_id: paymentId,
-    p_supplier_id: opts.supplierId,
-    p_purchase_id: opts.purchaseId ?? null,
-    p_amount: opts.amount,
-    p_method: opts.method,
-    p_payment_date: opts.date,
-    p_note: opts.note || null,
-    p_vault_user_id: opts.vaultUserId || null,
+  const { error: pErr } = await (supabase.from("supplier_payments" as any) as any).insert({
+    supplier_id: supplierId,
+    purchase_id: purchaseId ?? null,
+    amount,
+    method,
+    payment_date: date,
+    note: note || null,
+    created_by: userData.user?.id ?? null,
+    vault_user_id: vaultUserId || null,
   });
-  if (error) throw error;
-}
+  if (pErr) throw pErr;
 
-export async function voidSupplierPayment(paymentId: string) {
-  const { error } = await (supabase.rpc as any)("void_supplier_payment", {
-    p_payment_id: paymentId,
-  });
-  if (error) throw error;
+  const { data: purchases, error: sErr } = await supabase
+    .from("purchases")
+    .select("id, grand_total, amount_paid, purchase_date, reference_no")
+    .eq("supplier_id", supplierId)
+    .order("purchase_date", { ascending: true });
+  if (sErr) throw sErr;
+
+  const updates = distributeSupplierPayment((purchases ?? []) as any as PurchaseBalance[], amount, purchaseId);
+  for (const u of updates) {
+    const { error } = await supabase
+      .from("purchases")
+      .update({ amount_paid: u.amount_paid } as any)
+      .eq("id", u.id);
+    if (error) throw error;
+  }
 }

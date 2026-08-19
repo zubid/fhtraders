@@ -14,28 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/vault")({
   component: VaultPage,
@@ -54,8 +35,7 @@ function VaultPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["vault_users"],
     queryFn: async () =>
-      ((await (supabase.from("vault_users" as any) as any).select("*").order("name")).data ??
-        []) as any[],
+      ((await (supabase.from("vault_users" as any) as any).select("*").order("name")).data ?? []) as any[],
   });
   const { data: topups } = useQuery({
     queryKey: ["vault_topups"],
@@ -65,32 +45,22 @@ function VaultPage() {
   const { data: purchases } = useQuery({
     queryKey: ["vault_purchases_all"],
     queryFn: async () =>
-      ((
-        (await supabase
-          .from("purchases")
-          .select("id,vault_user_id,amount_paid,grand_total,purchase_date")) as any
-      ).data ?? []) as any[],
+      ((await supabase.from("purchases").select("id,vault_user_id,amount_paid,grand_total,purchase_date") as any).data ?? []) as any[],
   });
   const { data: expenses } = useQuery({
     queryKey: ["vault_expenses_all"],
     queryFn: async () =>
-      (((await supabase.from("expenses").select("id,vault_user_id,amount,expense_date")) as any)
-        .data ?? []) as any[],
+      ((await supabase.from("expenses").select("id,vault_user_id,amount,expense_date") as any).data ?? []) as any[],
   });
   const { data: custPayments } = useQuery({
     queryKey: ["vault_customer_payments_all"],
     queryFn: async () =>
-      ((await (supabase.from("payments") as any).select("id,vault_user_id,amount,payment_date"))
-        .data ?? []) as any[],
+      ((await (supabase.from("payments") as any).select("id,vault_user_id,amount,payment_date")).data ?? []) as any[],
   });
   const { data: supPayments } = useQuery({
     queryKey: ["vault_supplier_payments_all"],
     queryFn: async () =>
-      ((
-        await (supabase.from("supplier_payments" as any) as any)
-          .select("id,vault_user_id,amount,payment_date,purchase_id")
-          .eq("is_void", false)
-      ).data ?? []) as any[],
+      ((await (supabase.from("supplier_payments" as any) as any).select("id,vault_user_id,amount,payment_date,purchase_id")).data ?? []) as any[],
   });
 
   // purchases.amount_paid already includes supplier payments applied later through FIFO/general payment.
@@ -111,16 +81,13 @@ function VaultPage() {
   }, [supPayments]);
 
   const purchaseSpend = (userId: string) =>
-    (supPayments ?? [])
-      .filter((sp: any) => sp.vault_user_id === userId)
-      .reduce((s: number, sp: any) => s + Number(sp.amount), 0);
+    (purchases ?? [])
+      .filter((p: any) => p.vault_user_id === userId && !splitPurchaseIds.has(p.id))
+      .reduce((s: number, p: any) => s + Number(p.amount_paid ?? 0), 0);
 
   const splitPurchaseSpend = (userId: string) =>
     (supPayments ?? [])
-      .filter(
-        (sp: any) =>
-          sp.vault_user_id === userId && sp.purchase_id && splitPurchaseIds.has(sp.purchase_id),
-      )
+      .filter((sp: any) => sp.vault_user_id === userId && sp.purchase_id && splitPurchaseIds.has(sp.purchase_id))
       .reduce((s: number, sp: any) => s + Number(sp.amount), 0);
 
   const restaurantReceipts = (userId: string) =>
@@ -129,13 +96,9 @@ function VaultPage() {
       .reduce((s: number, c: any) => s + Number(c.amount), 0);
 
   const computeBalance = (u: any) => {
-    const tSum = (topups ?? [])
-      .filter((t) => t.vault_user_id === u.id)
-      .reduce((s, t) => s + Number(t.amount), 0);
-    const pSum = purchaseSpend(u.id);
-    const eSum = (expenses ?? [])
-      .filter((e: any) => e.vault_user_id === u.id)
-      .reduce((s, e: any) => s + Number(e.amount), 0);
+    const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
+    const pSum = purchaseSpend(u.id) + splitPurchaseSpend(u.id);
+    const eSum = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
     const cSum = restaurantReceipts(u.id);
     return Number(u.opening_balance) + tSum + cSum - pSum - eSum;
   };
@@ -144,27 +107,23 @@ function VaultPage() {
   const totalReceipts = (custPayments ?? [])
     .filter((c: any) => c.vault_user_id)
     .reduce((s: number, c: any) => s + Number(c.amount), 0);
-  const totalSpent =
-    (users ?? []).reduce((s: number, u: any) => s + purchaseSpend(u.id), 0) +
-    (expenses ?? [])
-      .filter((e: any) => e.vault_user_id)
-      .reduce((s, e: any) => s + Number(e.amount), 0);
+  const totalSpent = (users ?? []).reduce(
+    (s: number, u: any) => s + purchaseSpend(u.id) + splitPurchaseSpend(u.id),
+    0,
+  ) + (expenses ?? []).filter((e: any) => e.vault_user_id).reduce((s, e: any) => s + Number(e.amount), 0);
 
   const addUser = useMutation({
     mutationFn: async () => {
       if (!form.name.trim()) throw new Error("Enter a name");
       const { error } = await (supabase.from("vault_users" as any) as any).insert({
-        name: form.name.trim(),
-        phone: form.phone || null,
-        notes: form.notes || null,
+        name: form.name.trim(), phone: form.phone || null, notes: form.notes || null,
         opening_balance: Number(form.opening_balance) || 0,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["vault_users"] });
-      setAddOpen(false);
-      setForm({ name: "", phone: "", notes: "", opening_balance: 0 });
+      setAddOpen(false); setForm({ name: "", phone: "", notes: "", opening_balance: 0 });
       toast.success("Vault user created");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -176,18 +135,14 @@ function VaultPage() {
       if (Number(top.amount) <= 0) throw new Error("Enter an amount");
       const { data: u } = await supabase.auth.getUser();
       const { error } = await (supabase.from("vault_topups" as any) as any).insert({
-        vault_user_id: topOpen.id,
-        amount: Number(top.amount),
-        topup_date: top.topup_date,
-        note: top.note || null,
-        created_by: u.user?.id ?? null,
+        vault_user_id: topOpen.id, amount: Number(top.amount), topup_date: top.topup_date,
+        note: top.note || null, created_by: u.user?.id ?? null,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries();
-      setTopOpen(null);
-      setTop({ amount: 0, topup_date: today(), note: "" });
+      setTopOpen(null); setTop({ amount: 0, topup_date: today(), note: "" });
       toast.success("Top-up recorded");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -198,23 +153,15 @@ function VaultPage() {
       const { error } = await (supabase.from("vault_users" as any) as any).delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries();
-      setToDelete(null);
-      toast.success("Deleted");
-    },
+    onSuccess: () => { qc.invalidateQueries(); setToDelete(null); toast.success("Deleted"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const rowsForExport = (users ?? []).map((u: any) => {
     const bal = computeBalance(u);
     const spentP = purchaseSpend(u.id) + splitPurchaseSpend(u.id);
-    const spentE = (expenses ?? [])
-      .filter((e: any) => e.vault_user_id === u.id)
-      .reduce((s, e: any) => s + Number(e.amount), 0);
-    const tSum = (topups ?? [])
-      .filter((t) => t.vault_user_id === u.id)
-      .reduce((s, t) => s + Number(t.amount), 0);
+    const spentE = (expenses ?? []).filter((e: any) => e.vault_user_id === u.id).reduce((s, e: any) => s + Number(e.amount), 0);
+    const tSum = (topups ?? []).filter((t) => t.vault_user_id === u.id).reduce((s, t) => s + Number(t.amount), 0);
     const receipts = restaurantReceipts(u.id);
     return { u, bal, spentP, spentE, tSum, receipts };
   });
@@ -234,8 +181,7 @@ function VaultPage() {
         { key: "balance", label: "Balance", align: "right" },
       ],
       rows: rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => ({
-        name: u.name,
-        phone: u.phone ?? "-",
+        name: u.name, phone: u.phone ?? "-",
         opening: formatCurrency(u.opening_balance),
         topups: formatCurrency(tSum),
         receipts: formatCurrency(receipts),
@@ -254,25 +200,10 @@ function VaultPage() {
   const exportExcel = () => {
     downloadExcel(
       `vault-users-${today()}`,
-      [
-        "Name",
-        "Phone",
-        "Opening",
-        "Top-ups",
-        "Restaurant Receipts",
-        "Purchases",
-        "Expenses",
-        "Balance",
-      ],
+      ["Name", "Phone", "Opening", "Top-ups", "Restaurant Receipts", "Purchases", "Expenses", "Balance"],
       rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => [
-        u.name,
-        u.phone ?? "",
-        Number(u.opening_balance).toFixed(2),
-        tSum.toFixed(2),
-        receipts.toFixed(2),
-        spentP.toFixed(2),
-        spentE.toFixed(2),
-        bal.toFixed(2),
+        u.name, u.phone ?? "", Number(u.opening_balance).toFixed(2),
+        tSum.toFixed(2), receipts.toFixed(2), spentP.toFixed(2), spentE.toFixed(2), bal.toFixed(2),
       ]),
       "Vault Users",
     );
@@ -285,90 +216,34 @@ function VaultPage() {
         description="Cash holders who buy stock, receive restaurant cash, or pay expenses"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportExcel}>
-              <FileSpreadsheet className="mr-1 h-4 w-4" />
-              Excel
-            </Button>
-            <Button variant="outline" size="sm" onClick={printAll}>
-              <Printer className="mr-1 h-4 w-4" />
-              PDF
-            </Button>
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Add Vault User
-            </Button>
+            <Button variant="outline" size="sm" onClick={exportExcel}><FileSpreadsheet className="mr-1 h-4 w-4" />Excel</Button>
+            <Button variant="outline" size="sm" onClick={printAll}><Printer className="mr-1 h-4 w-4" />PDF</Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-4 w-4" />Add Vault User</Button>
           </div>
         }
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Vault Users</p>
-              <p className="mt-1 text-2xl font-bold">{(users ?? []).length}</p>
-            </div>
-            <Wallet className="h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Restaurant Receipts</p>
-              <p className="mt-1 text-2xl font-bold text-success">
-                {formatCurrency(totalReceipts)}
-              </p>
-            </div>
-            <HandCoins className="h-8 w-8 text-success" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Total On Hand</p>
-              <p
-                className={`mt-1 text-2xl font-bold ${totalOnHand < 0 ? "text-destructive" : "text-success"}`}
-              >
-                {formatCurrency(totalOnHand)}
-              </p>
-            </div>
-            <HandCoins className="h-8 w-8 text-success" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Spent via Vault</p>
-              <p className="mt-1 text-2xl font-bold text-destructive">
-                {formatCurrency(totalSpent)}
-              </p>
-            </div>
-            <Wallet className="h-8 w-8 text-destructive" />
-          </CardContent>
-        </Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Vault Users</p><p className="mt-1 text-2xl font-bold">{(users ?? []).length}</p></div><Wallet className="h-8 w-8 text-primary" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Restaurant Receipts</p><p className="mt-1 text-2xl font-bold text-success">{formatCurrency(totalReceipts)}</p></div><HandCoins className="h-8 w-8 text-success" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Total On Hand</p><p className={`mt-1 text-2xl font-bold ${totalOnHand < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(totalOnHand)}</p></div><HandCoins className="h-8 w-8 text-success" /></CardContent></Card>
+        <Card><CardContent className="flex items-center justify-between pt-6"><div><p className="text-sm text-muted-foreground">Spent via Vault</p><p className="mt-1 text-2xl font-bold text-destructive">{formatCurrency(totalSpent)}</p></div><Wallet className="h-8 w-8 text-destructive" /></CardContent></Card>
       </div>
 
       <Card className="p-4">
-        {isLoading ? (
-          <Skeleton className="h-32 w-full" />
-        ) : (users ?? []).length === 0 ? (
-          <div className="py-12 text-center text-muted-foreground">
-            No vault users yet. Add one to start tracking cash.
-          </div>
+        {isLoading ? <Skeleton className="h-32 w-full" /> : (users ?? []).length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">No vault users yet. Add one to start tracking cash.</div>
         ) : (
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Opening</TableHead>
-                <TableHead className="text-right">Top-ups</TableHead>
-                <TableHead className="text-right">Receipts</TableHead>
-                <TableHead className="text-right">Spent</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
+            <TableHeader><TableRow>
+              <TableHead>Name</TableHead><TableHead>Phone</TableHead>
+              <TableHead className="text-right">Opening</TableHead>
+              <TableHead className="text-right">Top-ups</TableHead>
+              <TableHead className="text-right">Receipts</TableHead>
+              <TableHead className="text-right">Spent</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow></TableHeader>
             <TableBody>
               {rowsForExport.map(({ u, bal, spentP, spentE, tSum, receipts }) => (
                 <TableRow key={u.id}>
@@ -376,34 +251,13 @@ function VaultPage() {
                   <TableCell>{u.phone ?? "-"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(u.opening_balance)}</TableCell>
                   <TableCell className="text-right text-success">{formatCurrency(tSum)}</TableCell>
-                  <TableCell className="text-right text-success">
-                    {formatCurrency(receipts)}
-                  </TableCell>
-                  <TableCell className="text-right text-destructive">
-                    {formatCurrency(spentP + spentE)}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right font-bold ${bal < 0 ? "text-destructive" : "text-success"}`}
-                  >
-                    {formatCurrency(bal)}
-                  </TableCell>
+                  <TableCell className="text-right text-success">{formatCurrency(receipts)}</TableCell>
+                  <TableCell className="text-right text-destructive">{formatCurrency(spentP + spentE)}</TableCell>
+                  <TableCell className={`text-right font-bold ${bal < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(bal)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Top-up"
-                      onClick={() => setTopOpen({ id: u.id, name: u.name })}
-                    >
-                      <HandCoins className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" asChild title="Details">
-                      <Link to="/vault/$id" params={{ id: u.id }}>
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setToDelete(u)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <Button variant="ghost" size="icon" title="Top-up" onClick={() => setTopOpen({ id: u.id, name: u.name })}><HandCoins className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" asChild title="Details"><Link to="/vault/$id" params={{ id: u.id }}><Eye className="h-4 w-4" /></Link></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setToDelete(u)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -415,48 +269,16 @@ function VaultPage() {
       {/* Add user dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>New Vault User</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>New Vault User</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone (optional)</Label>
-              <Input
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Opening Balance</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.opening_balance}
-                onChange={(e) => setForm({ ...form, opening_balance: +e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Input
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              />
-            </div>
+            <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Phone (optional)</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Opening Balance</Label><Input type="number" step="0.01" value={form.opening_balance} onChange={(e) => setForm({ ...form, opening_balance: +e.target.value })} /></div>
+            <div className="space-y-2"><Label>Notes</Label><Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => addUser.mutate()} disabled={addUser.isPending}>
-              Save
-            </Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={() => addUser.mutate()} disabled={addUser.isPending}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -464,39 +286,15 @@ function VaultPage() {
       {/* Top-up dialog */}
       <Dialog open={!!topOpen} onOpenChange={(v) => !v && setTopOpen(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add funds to {topOpen?.name}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Add funds to {topOpen?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={top.amount}
-                onChange={(e) => setTop({ ...top, amount: +e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={top.topup_date}
-                onChange={(e) => setTop({ ...top, topup_date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Note</Label>
-              <Input value={top.note} onChange={(e) => setTop({ ...top, note: e.target.value })} />
-            </div>
+            <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={top.amount} onChange={(e) => setTop({ ...top, amount: +e.target.value })} /></div>
+            <div className="space-y-2"><Label>Date</Label><Input type="date" value={top.topup_date} onChange={(e) => setTop({ ...top, topup_date: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Note</Label><Input value={top.note} onChange={(e) => setTop({ ...top, note: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTopOpen(null)}>
-              Cancel
-            </Button>
-            <Button onClick={() => addTop.mutate()} disabled={addTop.isPending}>
-              Save
-            </Button>
+            <Button variant="outline" onClick={() => setTopOpen(null)}>Cancel</Button>
+            <Button onClick={() => addTop.mutate()} disabled={addTop.isPending}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
