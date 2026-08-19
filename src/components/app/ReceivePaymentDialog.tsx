@@ -10,10 +10,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
 export function ReceivePaymentDialog({
@@ -54,17 +63,16 @@ export function ReceivePaymentDialog({
     queryKey: ["vault_users_active"],
     enabled: open,
     queryFn: async () =>
-      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
+      ((
+        await (supabase.from("vault_users" as any) as any)
+          .select("id,name")
+          .eq("is_active", true)
+          .order("name")
+      ).data ?? []) as any[],
   });
 
-  const outstanding = useMemo(
-    () => (sales ?? []).reduce((s, x) => s + saleBalance(x), 0),
-    [sales],
-  );
-  const unpaidSales = useMemo(
-    () => (sales ?? []).filter((s) => saleBalance(s) > 0),
-    [sales],
-  );
+  const outstanding = useMemo(() => (sales ?? []).reduce((s, x) => s + saleBalance(x), 0), [sales]);
+  const unpaidSales = useMemo(() => (sales ?? []).filter((s) => saleBalance(s) > 0), [sales]);
 
   useEffect(() => {
     if (open) {
@@ -73,9 +81,10 @@ export function ReceivePaymentDialog({
       setMethod("cash");
       setNote("");
       setDate(new Date().toISOString().slice(0, 10));
-      setVaultUserId("");
+      const preferred = (vaultUsers ?? []).find((v: any) => v.name === "Profit or Rotator Vault");
+      setVaultUserId(preferred?.id ?? "");
     }
-  }, [open, presetSaleId]);
+  }, [open, presetSaleId, vaultUsers]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -110,12 +119,15 @@ export function ReceivePaymentDialog({
           <div className="space-y-2">
             <Label>Apply to</Label>
             <Select value={target} onValueChange={setTarget}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="fifo">Oldest outstanding (FIFO)</SelectItem>
                 {unpaidSales.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.invoice_no} · {formatDate(s.sale_date)} · due {formatCurrency(saleBalance(s))}
+                    {s.invoice_no} · {formatDate(s.sale_date)} · due{" "}
+                    {formatCurrency(saleBalance(s))}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -124,16 +136,25 @@ export function ReceivePaymentDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Amount</Label>
-              <Input type="number" min="0" step="0.01" value={amount}
-                onChange={(e) => setAmount(+e.target.value)} />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(+e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Method</Label>
               <Select value={method} onValueChange={setMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m} value={m}>{METHOD_LABELS[m]}</SelectItem>
+                    <SelectItem key={m} value={m}>
+                      {METHOD_LABELS[m]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -145,27 +166,46 @@ export function ReceivePaymentDialog({
           </div>
           <div className="space-y-2">
             <Label>Note</Label>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional"
+            />
           </div>
           <div className="space-y-2">
-            <Label>Received By (Vault User)</Label>
+            <Label>Received By Vault *</Label>
             <Select value={vaultUserId} onValueChange={setVaultUserId}>
-              <SelectTrigger><SelectValue placeholder="Optional — add to vault balance" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select receiving vault" />
+              </SelectTrigger>
               <SelectContent>
-                {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                {(vaultUsers ?? []).map((v: any) => (
+                  <SelectItem key={v.id} value={v.id}>
+                    {v.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           {outstanding > 0 && (
-            <Button type="button" variant="outline" size="sm"
-              onClick={() => setAmount(Number(outstanding.toFixed(2)))}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAmount(Number(outstanding.toFixed(2)))}
+            >
               Pay full outstanding ({formatCurrency(outstanding)})
             </Button>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0}>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={save.isPending || amount <= 0 || !vaultUserId}
+          >
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record Payment
           </Button>
         </DialogFooter>
