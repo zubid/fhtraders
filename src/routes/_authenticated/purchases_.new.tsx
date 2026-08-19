@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,9 @@ function NewPurchase() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [splits, setSplits] = useState<{ vault_user_id: string; amount: number; method: string }[]>([]);
+  const defaultDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const isDirty = !!supplierId || !!newSupplier.trim() || lines.length > 0 || splits.length > 0 || !!notes.trim() || date !== defaultDate;
+  const { allowNavigation } = useUnsavedChangesGuard(isDirty);
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
@@ -65,8 +69,14 @@ function NewPurchase() {
 
   const save = useMutation({
     mutationFn: async () => {
-      if (lines.length === 0) throw new Error("Add at least one product");
+      if (!supplierId && !newSupplier.trim()) throw new Error("Select a supplier or enter a new supplier name.");
+      if (!date) throw new Error("Select a purchase date before saving.");
+      if (lines.length === 0) throw new Error("Add at least one product.");
+      if (lines.some((line) => line.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
+      if (lines.some((line) => line.unit_price <= 0)) throw new Error("Unit price must be greater than zero for every item.");
       const activeSplits = splits.filter((s) => Number(s.amount) > 0);
+      if (activeSplits.some((split) => !split.vault_user_id)) throw new Error("Select the Vault User that paid this amount.");
+      if (activeSplits.some((split) => !split.method)) throw new Error("Select a Payment Method for every payment.");
       const paidNow = activeSplits.reduce((s, p) => s + Number(p.amount), 0);
       if (paidNow > grandTotal + 0.001) throw new Error("Paid amount cannot exceed the grand total");
       let sid = supplierId || null;
@@ -110,6 +120,7 @@ function NewPurchase() {
     onSuccess: () => {
       qc.invalidateQueries();
       toast.success("Purchase saved · stock updated");
+      allowNavigation();
       navigate({ to: "/purchases" });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -152,14 +163,14 @@ function NewPurchase() {
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Supplier</Label>
+              <Label>Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                 <SelectContent>{(suppliers ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
               {!supplierId && <Input placeholder="or type a new supplier name" value={newSupplier} onChange={(e) => setNewSupplier(e.target.value)} />}
             </div>
-            <div className="space-y-2"><Label>Purchase Date</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
             <div className="flex items-center justify-between border-t border-border pt-4 text-lg font-bold">
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>

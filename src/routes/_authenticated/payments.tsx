@@ -27,6 +27,8 @@ function PaymentsPage() {
   const qc = useQueryClient();
   const { isAdmin } = useAuth();
   const [restaurantFilter, setRestaurantFilter] = useState("all");
+  const [vaultFilter, setVaultFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
   const [payFor, setPayFor] = useState<{ id: string; name: string } | null>(null);
   const [toDelete, setToDelete] = useState<any>(null);
   const [toEdit, setToEdit] = useState<any>(null);
@@ -36,6 +38,11 @@ function PaymentsPage() {
   const { data: restaurants } = useQuery({
     queryKey: ["restaurants-min"],
     queryFn: async () => (await supabase.from("restaurants").select("id,name").order("name")).data ?? [],
+  });
+
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault-users-min"],
+    queryFn: async () => ((await (supabase.from("vault_users" as any) as any).select("id,name").order("name")).data ?? []) as any[],
   });
 
   const { data: sales } = useQuery({
@@ -49,7 +56,7 @@ function PaymentsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payments")
-        .select("*, restaurants(name), sales(invoice_no)")
+        .select("*, restaurants(name), sales(invoice_no), vault_users(name)")
         .order("payment_date", { ascending: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -80,10 +87,27 @@ function PaymentsPage() {
   const filteredPayments = useMemo(() => {
     let rows = payments ?? [];
     if (restaurantFilter !== "all") rows = rows.filter((p: any) => p.restaurant_id === restaurantFilter);
+    if (vaultFilter !== "all") rows = rows.filter((p: any) => (p.vault_user_id ?? "missing") === vaultFilter);
+    if (methodFilter !== "all") rows = rows.filter((p: any) => p.method === methodFilter);
     if (from) rows = rows.filter((p: any) => p.payment_date >= from);
     if (to) rows = rows.filter((p: any) => p.payment_date <= to);
     return rows;
-  }, [payments, restaurantFilter, from, to]);
+  }, [payments, restaurantFilter, vaultFilter, methodFilter, from, to]);
+
+  const totalReceived = filteredPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+  const cashReceived = filteredPayments.filter((p: any) => p.method === "cash").reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+  const groupPayments = (key: (payment: any) => string) => {
+    const grouped = new Map<string, { name: string; payments: number; amount: number }>();
+    filteredPayments.forEach((payment: any) => {
+      const name = key(payment);
+      const row = grouped.get(name) ?? { name, payments: 0, amount: 0 };
+      row.payments += 1; row.amount += Number(payment.amount); grouped.set(name, row);
+    });
+    return [...grouped.values()].sort((a, b) => b.amount - a.amount);
+  };
+  const byRestaurant = groupPayments((p) => p.restaurants?.name ?? "Unknown Restaurant");
+  const byVault = groupPayments((p) => p.vault_users?.name ?? "Missing Vault");
+  const clearFilters = () => { setRestaurantFilter("all"); setVaultFilter("all"); setMethodFilter("all"); setFrom(""); setTo(""); };
 
   const del = useMutation({
     mutationFn: async (p: { id: string; restaurant_id: string }) => {
@@ -96,6 +120,13 @@ function PaymentsPage() {
   return (
     <div>
       <PageHeader title="Payments" description="Receive and track restaurant payments" />
+
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Total Received</p><p className="mt-1 text-2xl font-bold text-success">{formatCurrency(totalReceived)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Cash Received</p><p className="mt-1 text-2xl font-bold">{formatCurrency(cashReceived)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Outstanding Receivables</p><p className="mt-1 text-2xl font-bold text-destructive">{formatCurrency(totalOutstanding)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Payments Recorded</p><p className="mt-1 text-2xl font-bold">{filteredPayments.length}</p></CardContent></Card>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
@@ -136,8 +167,11 @@ function PaymentsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div><label className="text-xs text-muted-foreground">From</label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div><label className="text-xs text-muted-foreground">To</label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div className="min-w-44"><label className="text-xs text-muted-foreground">Vault User</label><Select value={vaultFilter} onValueChange={setVaultFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All vault users</SelectItem><SelectItem value="missing">Missing Vault</SelectItem>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select></div>
+              <div className="min-w-40"><label className="text-xs text-muted-foreground">Payment Method</label><Select value={methodFilter} onValueChange={setMethodFilter}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All methods</SelectItem>{Object.entries(METHOD_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
+              <div><label className="text-xs text-muted-foreground">From Date</label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div><label className="text-xs text-muted-foreground">To Date</label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <Button variant="outline" onClick={clearFilters}>Clear Filters</Button>
             </div>
             {isLoading ? (
               <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
@@ -148,7 +182,7 @@ function PaymentsPage() {
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead>Date</TableHead><TableHead>Restaurant</TableHead><TableHead>Invoice</TableHead>
-                    <TableHead>Method</TableHead><TableHead className="text-right">Amount</TableHead><TableHead></TableHead>
+                    <TableHead>Method</TableHead><TableHead>Received By Vault</TableHead><TableHead>Note</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Actions</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {filteredPayments.map((p: any) => (
@@ -161,6 +195,8 @@ function PaymentsPage() {
                         </TableCell>
                         <TableCell className="font-mono text-xs">{p.sales?.invoice_no ?? "General (FIFO)"}</TableCell>
                         <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>
+                        <TableCell className={p.vault_users?.name ? "" : "font-semibold text-destructive"}>{p.vault_users?.name ?? "Missing Vault"}</TableCell>
+                        <TableCell className="max-w-48 truncate">{p.note ?? "-"}</TableCell>
                         <TableCell className="text-right font-medium text-success">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-right">
                           {isAdmin && (
@@ -178,6 +214,12 @@ function PaymentsPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {[{ title: "Received by Restaurant", rows: byRestaurant, first: "Restaurant" }, { title: "Received by Vault", rows: byVault, first: "Vault User" }].map((section) => (
+          <Card key={section.title}><CardHeader><CardTitle className="text-base">{section.title}</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>{section.first}</TableHead><TableHead className="text-right">Payments</TableHead><TableHead className="text-right">Amount Received</TableHead></TableRow></TableHeader><TableBody>{section.rows.map((row) => <TableRow key={row.name}><TableCell className={row.name === "Missing Vault" ? "font-semibold text-destructive" : "font-medium"}>{row.name}</TableCell><TableCell className="text-right">{row.payments}</TableCell><TableCell className="text-right font-medium">{formatCurrency(row.amount)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card>
+        ))}
       </div>
 
       {payFor && (
