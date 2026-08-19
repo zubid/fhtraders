@@ -108,29 +108,19 @@ function EditPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
-      // Keep the payment ledger in sync: vault spending is derived from
-      // supplier_payments rows linked to this purchase.
-      // Always re-read the linked payments at save time (cached data can be stale)
-      // and verify the update actually touched them (RLS can silently match 0 rows).
+      // The purchase update above triggers an atomic database sync for every
+      // linked supplier payment. Re-read the ledger to verify the invariant so
+      // a purchase can never appear saved while its vault ledger is stale.
       const { data: linked, error: lErr } = await (supabase.from("supplier_payments" as any) as any)
-        .select("id")
+        .select("id,vault_user_id")
         .eq("purchase_id", id);
       if (lErr) throw lErr;
-      if ((linked ?? []).length > 0) {
-        const { data: updated, error: spErr } = await (supabase.from("supplier_payments" as any) as any)
-          .update({
-            vault_user_id: vaultUserId || null,
-            ...(supplierId ? { supplier_id: supplierId } : {}),
-            payment_date: date,
-          })
-          .eq("purchase_id", id)
-          .select("id");
-        if (spErr) throw spErr;
-        if ((updated ?? []).length !== (linked ?? []).length) {
-          throw new Error(
-            "Purchase saved, but the linked vault payment rows could not be reassigned (permission denied). Ask an admin to re-save this purchase.",
-          );
-        }
+      const expectedVaultUserId = vaultUserId || null;
+      const stalePayments = (linked ?? []).filter(
+        (payment: any) => payment.vault_user_id !== expectedVaultUserId,
+      );
+      if (stalePayments.length > 0) {
+        throw new Error("Purchase saved, but its supplier payment ledger did not synchronize. Please retry or contact an admin.");
       }
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); navigate({ to: "/purchases" }); },
@@ -195,7 +185,7 @@ function EditPurchase() {
               <p className="text-xs text-muted-foreground">
                 {(paySplits ?? []).length} payment{(paySplits ?? []).length > 1 ? "s" : ""} totalling{" "}
                 {formatCurrency((paySplits ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0))} recorded for this
-                purchase — they will be reassigned to the selected vault user.
+                purchase — all linked supplier payment rows will be reassigned to the selected vault user.
               </p>
             )}
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
