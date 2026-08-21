@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Wallet, Users, Printer } from "lucide-react";
+import { Plus, Trash2, Wallet, Users, Printer, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/_authenticated/expenses")({
@@ -32,11 +33,13 @@ function ExpensesPage() {
   const [genOpen, setGenOpen] = useState(false);
   const [salOpen, setSalOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [editingCat, setEditingCat] = useState<any>(null);
   const [toDelete, setToDelete] = useState<any>(null);
 
   const [gen, setGen] = useState({ expense_date: today(), category_id: "", amount: 0, description: "", vault_user_id: "" });
   const [sal, setSal] = useState({ expense_date: today(), employee_id: "", salary_month: thisMonth(), amount: 0, description: "", vault_user_id: "" });
   const [catName, setCatName] = useState("");
+  const [catClass, setCatClass] = useState<"opex" | "capex">("opex");
   const [vaultFilter, setVaultFilter] = useState<string>("all");
 
   const { data: cats } = useQuery({
@@ -57,7 +60,7 @@ function ExpensesPage() {
     queryFn: async () =>
       (await supabase
         .from("expenses")
-        .select("*, expense_categories(name), employees(name), vault_users(name)")
+        .select("*, expense_categories(name,accounting_class), employees(name), vault_users(name)")
         .order("expense_date", { ascending: false })).data ?? [],
   });
 
@@ -106,10 +109,20 @@ function ExpensesPage() {
   const addCat = useMutation({
     mutationFn: async () => {
       if (!catName.trim()) throw new Error("Enter a name");
-      const { error } = await supabase.from("expense_categories").insert({ name: catName.trim() });
+      const { error } = await supabase.from("expense_categories").insert({ name: catName.trim(), accounting_class: catClass });
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense_categories"] }); setCatName(""); setCatOpen(false); toast.success("Category added"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense_categories"] }); setCatName(""); setCatClass("opex"); setCatOpen(false); toast.success("Category added"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+
+  const updateCat = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("expense_categories").update({ accounting_class: catClass }).eq("id", editingCat.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["expense_categories"] }); qc.invalidateQueries({ queryKey: ["report-expenses"] }); setEditingCat(null); toast.success("Classification updated"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -131,6 +144,7 @@ function ExpensesPage() {
       subtitle: `${formatDate(from)} to ${formatDate(to)}`,
       columns: [
         { key: "date", label: "Date" },
+        { key: "class", label: "Accounting Class" },
         { key: "type", label: "Type" },
         { key: "ref", label: "Category / Employee" },
         { key: "desc", label: "Description" },
@@ -139,6 +153,7 @@ function ExpensesPage() {
       ],
       rows: filtered.map((e: any) => ({
         date: formatDate(e.expense_date),
+        class: e.type === "salary" || e.expense_categories?.accounting_class !== "capex" ? "OPEX" : "CAPEX",
         type: e.type === "salary" ? "Salary" : "General",
         ref: e.type === "salary" ? e.employees?.name ?? "—" : e.expense_categories?.name ?? "—",
         desc: e.description ?? "",
@@ -246,7 +261,7 @@ function ExpensesPage() {
             <div className="mb-3 flex justify-end"><Button size="sm" onClick={() => setCatOpen(true)}><Plus className="mr-1 h-4 w-4" />Add Category</Button></div>
             <div className="flex flex-wrap gap-2">
               {(cats ?? []).map((c: any) => (
-                <span key={c.id} className="rounded-full border border-border px-3 py-1 text-sm" style={{ borderColor: c.color }}>{c.name}</span>
+                <div key={c.id} className="flex items-center gap-2 rounded-full border border-border px-3 py-1 text-sm" style={{ borderColor: c.color }}><span>{c.name}</span><Badge variant={c.accounting_class === "capex" ? "default" : "secondary"}>{c.accounting_class === "capex" ? "CAPEX" : "OPEX"}</Badge><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingCat(c); setCatClass(c.accounting_class === "capex" ? "capex" : "opex"); }}><Pencil className="h-3 w-3" /></Button></div>
               ))}
               {(cats ?? []).length === 0 && <p className="text-muted-foreground">No categories yet.</p>}
             </div>
@@ -268,11 +283,12 @@ function ExpensesPage() {
               }}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {(cats ?? []).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {(cats ?? []).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name} · {c.accounting_class === "capex" ? "CAPEX" : "OPEX"}</SelectItem>)}
                   <SelectItem value="__new__">+ Add new category…</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {(cats ?? []).find((c: any) => c.id === gen.category_id)?.accounting_class === "capex" && <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">Capital expenditure reduces cash but is not deducted as an operating expense in Profit &amp; Loss.</p>}
             <div className="space-y-2"><Label>Amount</Label><Input type="number" step="0.01" value={gen.amount} onChange={(e) => setGen({ ...gen, amount: +e.target.value })} /></div>
             <div className="space-y-2"><Label>Description</Label><Input value={gen.description} onChange={(e) => setGen({ ...gen, description: e.target.value })} /></div>
             <div className="space-y-2">
@@ -324,8 +340,15 @@ function ExpensesPage() {
       <Dialog open={catOpen} onOpenChange={setCatOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Add Expense Category</DialogTitle></DialogHeader>
-          <div className="space-y-2"><Label>Name</Label><Input value={catName} onChange={(e) => setCatName(e.target.value)} /></div>
+          <div className="space-y-4"><div className="space-y-2"><Label>Category Name *</Label><Input value={catName} onChange={(e) => setCatName(e.target.value)} /></div><div className="space-y-2"><Label>Accounting Class *</Label><Select value={catClass} onValueChange={(v: "opex" | "capex") => setCatClass(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="opex">Operating Expense (OPEX)</SelectItem><SelectItem value="capex">Capital Expenditure (CAPEX)</SelectItem></SelectContent></Select></div></div>
           <DialogFooter><Button variant="outline" onClick={() => setCatOpen(false)}>Cancel</Button><Button onClick={() => addCat.mutate()} disabled={addCat.isPending}>Save</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingCat} onOpenChange={(open) => !open && setEditingCat(null)}>
+        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Edit {editingCat?.name} Classification</DialogTitle></DialogHeader>
+          <div className="space-y-3"><Select value={catClass} onValueChange={(v: "opex" | "capex") => setCatClass(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="opex">Operating Expense (OPEX)</SelectItem><SelectItem value="capex">Capital Expenditure (CAPEX)</SelectItem></SelectContent></Select><p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">Changing this classification will update how all expenses in this category appear in Profit &amp; Loss reports.</p></div>
+          <DialogFooter><Button variant="outline" onClick={() => setEditingCat(null)}>Cancel</Button><Button onClick={() => updateCat.mutate()} disabled={updateCat.isPending}>Confirm Change</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
