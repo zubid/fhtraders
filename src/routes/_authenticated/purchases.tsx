@@ -50,7 +50,7 @@ function PurchasesPage() {
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
     queryFn: async () =>
-      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
 
   const filtered = useMemo(() => {

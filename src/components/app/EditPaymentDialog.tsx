@@ -45,6 +45,7 @@ export function EditPaymentDialog({
       ((await (supabase.from("vault_users" as any) as any)
         .select("id,name")
         .eq("is_active", true)
+        .eq("vault_type", "business_cash")
         .order("name")).data ?? []) as any[],
   });
 
