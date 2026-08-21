@@ -57,7 +57,7 @@ function SettingsPage() {
   const saveBranding = useMutation({
     mutationFn: async () => {
       const payload = {
-        business_name: form.business_name || "StockFlow",
+        business_name: form.business_name || "FH Traders",
         business_tagline: form.business_tagline || "",
         logo_url: form.logo_url || null,
         address: form.address || null,

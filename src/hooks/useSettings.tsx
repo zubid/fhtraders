@@ -31,7 +31,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (data) setBranding(data);
     // browser tab title reflects business name
     if (typeof document !== "undefined") {
-      document.title = `${settings.business_name} — ${settings.business_tagline}`;
+      document.title = window.location.pathname === "/auth"
+        ? `Sign in — ${settings.business_name}`
+        : `${settings.business_name} — ${settings.business_tagline}`;
     }
   }, [data]);
 
