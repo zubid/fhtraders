@@ -79,8 +79,12 @@ export function useAnalytics(from: string, to: string) {
     const receiptMethods = [...receipts.reduce((map: Map<string,number>, row:any)=>map.set(row.method ?? "other",(map.get(row.method ?? "other") ?? 0)+Number(row.amount)),new Map()).entries()].map(([name,value])=>({name,value}));
     const expenseCategories = [...ex.reduce((map: Map<string,number>, row:any) => { const name=row.type === "salary" ? "Salaries" : (row.expense_categories?.name ?? "General / Uncategorized"); return map.set(name,(map.get(name) ?? 0)+Number(row.amount)); },new Map()).entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
     const topupTotal = (periodTopups.data ?? []).reduce((n,row)=>n+Number(row.amount),0);
-    const periodPurchaseSpend = p.filter((row:any)=>!splitIds.has(row.id)).reduce((n,row)=>n+Number(row.amount_paid),0) + (periodSupplierPayments.data ?? []).filter((row:any)=>row.purchase_id && splitIds.has(row.purchase_id)).reduce((n,row)=>n+Number(row.amount),0);
-    const netCashMovement = customerCashReceived + topupTotal - periodPurchaseSpend - totalExpenses;
+    // This is intentionally an attributed operational view, not an audited
+    // supplier payment-event timeline. Ordinary purchases use amount_paid on
+    // the purchase date; genuine multi-vault splits use their linked payment
+    // rows on the split payment date. The two representations never overlap.
+    const attributedPurchaseSpend = p.filter((row:any)=>!splitIds.has(row.id)).reduce((n,row)=>n+Number(row.amount_paid),0) + (periodSupplierPayments.data ?? []).filter((row:any)=>row.purchase_id && splitIds.has(row.purchase_id)).reduce((n,row)=>n+Number(row.amount),0);
+    const netOperationalCashMovement = customerCashReceived + topupTotal - attributedPurchaseSpend - totalExpenses;
 
     const byRestaurant = new Map<string, { name: string; sales: number; cost: number; orders: number }>();
     const byCategory = new Map<string, { revenue: number; cost: number }>();
@@ -99,7 +103,7 @@ export function useAnalytics(from: string, to: string) {
     s.forEach((row) => { const day=dayMap.get(row.sale_date) ?? {sales:0,purchases:0}; day.sales += Number(row.grand_total); dayMap.set(row.sale_date,day); });
     p.forEach((row) => { const day=dayMap.get(row.purchase_date) ?? {sales:0,purchases:0}; day.purchases += Number(row.grand_total); dayMap.set(row.purchase_date,day); });
     trend.push(...[...dayMap].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,v])=>({date:date.slice(5),...v})));
-    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, totalExpenses, generalExpenses, salaries, expenseCategories, grossProfit, netProfit: grossProfit - totalExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, periodPurchaseSpend, netCashMovement,
+    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, totalExpenses, generalExpenses, salaries, expenseCategories, grossProfit, netProfit: grossProfit - totalExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, attributedPurchaseSpend, netOperationalCashMovement,
       sales: s, purchases: p, expenses: ex, payments: receipts,
       byRestaurant: [...byRestaurant.values()].map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.sales - a.sales),
       byCategory: [...byCategory].map(([name, v]) => ({ name, ...v, profit: v.revenue - v.cost })).sort((a, b) => b.revenue - a.revenue),
