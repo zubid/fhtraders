@@ -21,7 +21,7 @@ const query = async (table: string, select: string, dateField?: string, from?: s
 export function useAnalytics(from: string, to: string) {
   const sales = useQuery({ queryKey: ["report-sales", from, to], queryFn: () => query("sales", "id,sale_date,invoice_no,grand_total,amount_received,total_cost,restaurants(name),sale_items(quantity,line_total,cost_price,products(name,categories(name)))", "sale_date", from, to) });
   const purchases = useQuery({ queryKey: ["report-purchases", from, to], queryFn: () => query("purchases", "id,purchase_date,reference_no,grand_total,amount_paid,suppliers(name)", "purchase_date", from, to) });
-  const expenses = useQuery({ queryKey: ["report-expenses", from, to], queryFn: () => query("expenses", "id,expense_date,type,amount,description,expense_categories(name),employees(name),vault_users(name)", "expense_date", from, to) });
+  const expenses = useQuery({ queryKey: ["report-expenses", from, to], queryFn: () => query("expenses", "id,expense_date,type,amount,description,expense_categories(name,accounting_class),employees(name),vault_users(name)", "expense_date", from, to) });
   const payments = useQuery({ queryKey: ["report-payments", from, to], queryFn: () => query("payments", "id,payment_date,amount,method,note,restaurants(name),sales(invoice_no),vault_users(name)", "payment_date", from, to) });
   const allSales = useQuery({ queryKey: ["report-current-receivables"], queryFn: () => query("sales", "grand_total,amount_received,restaurants(name)") });
   const allPurchases = useQuery({ queryKey: ["report-current-payables"], queryFn: () => query("purchases", "grand_total,amount_paid,suppliers(name)") });
@@ -42,15 +42,18 @@ export function useAnalytics(from: string, to: string) {
       const itemCost = (row.sale_items ?? []).reduce((n: number, item: any) => n + Number(item.cost_price) * Number(item.quantity), 0);
       return sum + ((row.sale_items ?? []).length ? itemCost : Number(row.total_cost));
     }, 0);
-    const totalExpenses = ex.reduce((sum, row) => sum + Number(row.amount), 0);
+    const expenseClass = (row: any): "opex" | "capex" => row.type === "salary" || row.expense_categories?.accounting_class !== "capex" ? "opex" : "capex";
+    const totalCashExpenseOutflow = ex.reduce((sum, row) => sum + Number(row.amount), 0);
     const grossProfit = totalSales - totalCost;
     const totalPurchases = p.reduce((sum, row) => sum + Number(row.grand_total), 0);
     const margin = totalSales > 0 ? grossProfit / totalSales * 100 : 0;
     const outstanding = (allSales.data ?? []).reduce((sum, row) => sum + Math.max(Number(row.grand_total) - Number(row.amount_received), 0), 0);
     const supplierPayables = (allPurchases.data ?? []).reduce((sum, row) => sum + Math.max(Number(row.grand_total) - Number(row.amount_paid), 0), 0);
     const customerCashReceived = receipts.reduce((sum, row) => sum + Number(row.amount), 0);
-    const generalExpenses = ex.filter((row) => row.type !== "salary").reduce((sum, row) => sum + Number(row.amount), 0);
+    const generalOperatingExpenses = ex.filter((row) => row.type !== "salary" && expenseClass(row) === "opex").reduce((sum, row) => sum + Number(row.amount), 0);
     const salaries = ex.filter((row) => row.type === "salary").reduce((sum, row) => sum + Number(row.amount), 0);
+    const operatingExpenses = generalOperatingExpenses + salaries;
+    const capitalExpenditure = ex.filter((row) => row.type !== "salary" && expenseClass(row) === "capex").reduce((sum, row) => sum + Number(row.amount), 0);
 
     // Kept deliberately identical to the working Vault page: multi-vault purchase
     // splits use supplier_payments; every other purchase uses purchases.amount_paid.
@@ -77,14 +80,16 @@ export function useAnalytics(from: string, to: string) {
     const supplierPayableSummary = [...(allPurchases.data ?? []).reduce((map: Map<string, any>, row: any) => { const name=row.suppliers?.name ?? "Unknown"; const x=map.get(name) ?? {name,purchases:0,paid:0,outstanding:0}; x.purchases += Number(row.grand_total); x.paid += Number(row.amount_paid); x.outstanding += Math.max(Number(row.grand_total)-Number(row.amount_paid),0); return map.set(name,x); }, new Map()).values()].sort((a:any,b:any)=>b.outstanding-a.outstanding);
     const inventoryByCategory = [...inventory.reduce((map: Map<string, number>, row: any) => { const name=row.categories?.name ?? "Uncategorized"; return map.set(name,(map.get(name) ?? 0)+row.inventoryValue); }, new Map()).entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
     const receiptMethods = [...receipts.reduce((map: Map<string,number>, row:any)=>map.set(row.method ?? "other",(map.get(row.method ?? "other") ?? 0)+Number(row.amount)),new Map()).entries()].map(([name,value])=>({name,value}));
-    const expenseCategories = [...ex.reduce((map: Map<string,number>, row:any) => { const name=row.type === "salary" ? "Salaries" : (row.expense_categories?.name ?? "General / Uncategorized"); return map.set(name,(map.get(name) ?? 0)+Number(row.amount)); },new Map()).entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+    const expenseBreakdown = (classification: "opex" | "capex") => [...ex.filter((row:any) => expenseClass(row) === classification).reduce((map: Map<string,number>, row:any) => { const name=row.type === "salary" ? "Salaries" : (row.expense_categories?.name ?? "General / Uncategorized"); return map.set(name,(map.get(name) ?? 0)+Number(row.amount)); },new Map()).entries()].map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value);
+    const opexBreakdown = expenseBreakdown("opex");
+    const capexBreakdown = expenseBreakdown("capex");
     const topupTotal = (periodTopups.data ?? []).reduce((n,row)=>n+Number(row.amount),0);
     // This is intentionally an attributed operational view, not an audited
     // supplier payment-event timeline. Ordinary purchases use amount_paid on
     // the purchase date; genuine multi-vault splits use their linked payment
     // rows on the split payment date. The two representations never overlap.
     const attributedPurchaseSpend = p.filter((row:any)=>!splitIds.has(row.id)).reduce((n,row)=>n+Number(row.amount_paid),0) + (periodSupplierPayments.data ?? []).filter((row:any)=>row.purchase_id && splitIds.has(row.purchase_id)).reduce((n,row)=>n+Number(row.amount),0);
-    const netOperationalCashMovement = customerCashReceived + topupTotal - attributedPurchaseSpend - totalExpenses;
+    const netCashMovement = customerCashReceived + topupTotal - attributedPurchaseSpend - operatingExpenses - capitalExpenditure;
 
     const byRestaurant = new Map<string, { name: string; sales: number; cost: number; orders: number }>();
     const byCategory = new Map<string, { revenue: number; cost: number }>();
@@ -103,7 +108,7 @@ export function useAnalytics(from: string, to: string) {
     s.forEach((row) => { const day=dayMap.get(row.sale_date) ?? {sales:0,purchases:0}; day.sales += Number(row.grand_total); dayMap.set(row.sale_date,day); });
     p.forEach((row) => { const day=dayMap.get(row.purchase_date) ?? {sales:0,purchases:0}; day.purchases += Number(row.grand_total); dayMap.set(row.purchase_date,day); });
     trend.push(...[...dayMap].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,v])=>({date:date.slice(5),...v})));
-    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, totalExpenses, generalExpenses, salaries, expenseCategories, grossProfit, netProfit: grossProfit - totalExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, attributedPurchaseSpend, netOperationalCashMovement,
+    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, operatingExpenses, capitalExpenditure, generalOperatingExpenses, salaries, totalCashExpenseOutflow, opexBreakdown, capexBreakdown, grossProfit, operatingProfit: grossProfit - operatingExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, attributedPurchaseSpend, netCashMovement,
       sales: s, purchases: p, expenses: ex, payments: receipts,
       byRestaurant: [...byRestaurant.values()].map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.sales - a.sales),
       byCategory: [...byCategory].map(([name, v]) => ({ name, ...v, profit: v.revenue - v.cost })).sort((a, b) => b.revenue - a.revenue),

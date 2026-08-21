@@ -130,18 +130,21 @@ export type Database = {
       }
       expense_categories: {
         Row: {
+          accounting_class: string
           color: string
           created_at: string
           id: string
           name: string
         }
         Insert: {
+          accounting_class?: string
           color?: string
           created_at?: string
           id?: string
           name: string
         }
         Update: {
+          accounting_class?: string
           color?: string
           created_at?: string
           id?: string

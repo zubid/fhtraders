@@ -71,8 +71,8 @@ function Dashboard() {
 
       {!a.isLoading && isAdmin && (
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Kpi title="Total Expenses" value={formatCurrency(a.totalExpenses)} icon={<Wallet className="h-5 w-5" />} accent="bg-destructive/10 text-destructive" />
-          <Kpi title="Net Profit (after expenses)" value={formatCurrency(a.netProfit)} icon={<PiggyBank className="h-5 w-5" />} accent={a.netProfit >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"} />
+          <Kpi title="Operating Expenses" value={formatCurrency(a.operatingExpenses)} icon={<Wallet className="h-5 w-5" />} accent="bg-destructive/10 text-destructive" />
+          <Kpi title="Operating Profit / Loss" value={formatCurrency(a.operatingProfit)} icon={<PiggyBank className="h-5 w-5" />} accent={a.operatingProfit >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"} />
           <Kpi title="Outstanding Receivables" value={formatCurrency(a.outstanding)} icon={<CreditCard className="h-5 w-5" />} accent="bg-warning/15 text-warning-foreground" />
           <Kpi title="Low Stock Items" value={String(lowCount)} icon={<AlertTriangle className="h-5 w-5" />} accent="bg-warning/15 text-warning-foreground" />
         </div>
