@@ -81,26 +81,23 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "StockFlow — Store Management & Distribution" },
+      { title: "FH Traders — Supply Management & Distribution" },
       {
         name: "description",
         content:
-          "Manage purchases, inventory, restaurant accounts, multi-item sales, and profit analytics for a food distribution business.",
+          "Supply management and distribution for FH Traders, including purchases, inventory, restaurant accounts, sales, and analytics.",
       },
-      { name: "author", content: "StockFlow" },
-      { property: "og:title", content: "StockFlow — Store Management & Distribution" },
+      { name: "author", content: "FH Traders" },
+      { property: "og:title", content: "FH Traders — Supply Management & Distribution" },
       {
         property: "og:description",
         content:
-          "Manage purchases, inventory, restaurant accounts, multi-item sales, and profit analytics for a food distribution business.",
+          "Supply management and distribution for FH Traders, including purchases, inventory, restaurant accounts, sales, and analytics.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
-      { name: "twitter:title", content: "StockFlow — Store Management & Distribution" },
-      { name: "twitter:description", content: "Manage purchases, inventory, restaurant accounts, multi-item sales, and profit analytics for a food distribution business." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1adce051-9b48-41d4-acff-f3f8ff924e5c/id-preview-27b46e23--b2af7391-07c5-40b3-b885-8e7ac82b9e2d.lovable.app-1784272800593.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1adce051-9b48-41d4-acff-f3f8ff924e5c/id-preview-27b46e23--b2af7391-07c5-40b3-b885-8e7ac82b9e2d.lovable.app-1784272800593.png" },
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "FH Traders — Supply Management & Distribution" },
+      { name: "twitter:description", content: "Supply management and distribution for FH Traders, including purchases, inventory, restaurant accounts, sales, and analytics." },
     ],
     links: [
       {

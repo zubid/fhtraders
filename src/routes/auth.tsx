@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Warehouse, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useSettings } from "@/hooks/useSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,12 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Sign in — StockFlow" }] }),
+  head: () => ({ meta: [{ title: "Sign in — FH Traders" }] }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const { session, signIn, loading, role } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
@@ -26,6 +28,10 @@ function AuthPage() {
       navigate({ to: role === "admin" ? "/dashboard" : "/stock", replace: true });
     }
   }, [session, loading, role, navigate]);
+
+  useEffect(() => {
+    document.title = `Sign in — ${settings.business_name}`;
+  }, [settings.business_name]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,11 +46,19 @@ function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-secondary via-background to-muted px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
-            <Warehouse className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">StockFlow</h1>
-          <p className="text-sm text-muted-foreground">Store Management & Distribution System</p>
+          {settings.logo_url ? (
+            <img
+              src={settings.logo_url}
+              alt={`${settings.business_name} logo`}
+              className="mb-3 h-14 w-14 rounded-2xl object-contain shadow-lg"
+            />
+          ) : (
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
+              <Warehouse className="h-7 w-7" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-foreground">{settings.business_name}</h1>
+          <p className="text-sm text-muted-foreground">{settings.business_tagline}</p>
         </div>
         <Card>
           <CardHeader>

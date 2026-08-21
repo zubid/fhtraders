@@ -16,8 +16,8 @@ export type Branding = {
 
 export const DEFAULT_BRANDING: Branding = {
   id: null,
-  business_name: "StockFlow",
-  business_tagline: "Store Management & Distribution",
+  business_name: "FH Traders",
+  business_tagline: "Supply Management & Distribution",
   logo_url: null,
   address: null,
   phone: null,
