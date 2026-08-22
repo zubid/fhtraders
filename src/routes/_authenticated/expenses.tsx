@@ -49,7 +49,7 @@ function ExpensesPage() {
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
     queryFn: async () =>
-      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
   const { data: employees } = useQuery({
     queryKey: ["employees-active"],
@@ -77,11 +77,12 @@ function ExpensesPage() {
   const addGeneral = useMutation({
     mutationFn: async () => {
       if (Number(gen.amount) <= 0) throw new Error("Enter an amount");
+      if (!gen.vault_user_id) throw new Error("Paid By Vault is required");
       const { data: u } = await supabase.auth.getUser();
       const { error } = await supabase.from("expenses").insert({
         type: "general", expense_date: gen.expense_date, category_id: gen.category_id || null,
         amount: Number(gen.amount), description: gen.description || null, created_by: u.user?.id ?? null,
-        vault_user_id: gen.vault_user_id || null,
+        vault_user_id: gen.vault_user_id,
       });
       if (error) throw error;
     },
@@ -93,12 +94,13 @@ function ExpensesPage() {
     mutationFn: async () => {
       if (!sal.employee_id) throw new Error("Select an employee");
       if (Number(sal.amount) <= 0) throw new Error("Enter an amount");
+      if (!sal.vault_user_id) throw new Error("Paid By Vault is required");
       const { data: u } = await supabase.auth.getUser();
       const { error } = await supabase.from("expenses").insert({
         type: "salary", expense_date: sal.expense_date, employee_id: sal.employee_id,
         salary_month: sal.salary_month, amount: Number(sal.amount), description: sal.description || null,
         created_by: u.user?.id ?? null,
-        vault_user_id: sal.vault_user_id || null,
+        vault_user_id: sal.vault_user_id,
       });
       if (error) throw error;
     },
@@ -294,12 +296,12 @@ function ExpensesPage() {
             <div className="space-y-2">
               <Label>Paid By (Vault User)</Label>
               <Select value={gen.vault_user_id} onValueChange={(v) => setGen({ ...gen, vault_user_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger>
                 <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setGenOpen(false)}>Cancel</Button><Button onClick={() => addGeneral.mutate()} disabled={addGeneral.isPending}>Save</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setGenOpen(false)}>Cancel</Button><Button onClick={() => addGeneral.mutate()} disabled={addGeneral.isPending || !gen.vault_user_id}>Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -327,12 +329,12 @@ function ExpensesPage() {
             <div className="space-y-2">
               <Label>Paid By (Vault User)</Label>
               <Select value={sal.vault_user_id} onValueChange={(v) => setSal({ ...sal, vault_user_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger>
                 <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => setSalOpen(false)}>Cancel</Button><Button onClick={() => addSalary.mutate()} disabled={addSalary.isPending}>Save</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setSalOpen(false)}>Cancel</Button><Button onClick={() => addSalary.mutate()} disabled={addSalary.isPending || !sal.vault_user_id}>Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

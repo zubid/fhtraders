@@ -26,7 +26,7 @@ export function useAnalytics(from: string, to: string) {
   const allSales = useQuery({ queryKey: ["report-current-receivables"], queryFn: () => query("sales", "grand_total,amount_received,restaurants(name)") });
   const allPurchases = useQuery({ queryKey: ["report-current-payables"], queryFn: () => query("purchases", "grand_total,amount_paid,suppliers(name)") });
   const products = useQuery({ queryKey: ["report-current-inventory"], queryFn: () => query("products", "id,name,current_stock,avg_cost,reorder_level,categories(name)") });
-  const vaultUsers = useQuery({ queryKey: ["report-vault-users"], queryFn: () => query("vault_users", "id,opening_balance") });
+  const vaultUsers = useQuery({ queryKey: ["report-vault-users"], queryFn: () => query("vault_users", "id,opening_balance,vault_type") });
   const topups = useQuery({ queryKey: ["report-vault-topups"], queryFn: () => query("vault_topups", "vault_user_id,amount") });
   const vaultPurchases = useQuery({ queryKey: ["report-vault-purchases"], queryFn: () => query("purchases", "id,vault_user_id,amount_paid") });
   const vaultExpenses = useQuery({ queryKey: ["report-vault-expenses"], queryFn: () => query("expenses", "vault_user_id,amount") });
@@ -34,6 +34,8 @@ export function useAnalytics(from: string, to: string) {
   const supplierPayments = useQuery({ queryKey: ["report-vault-supplier-payments"], queryFn: () => query("supplier_payments", "purchase_id,vault_user_id,amount") });
   const periodTopups = useQuery({ queryKey: ["report-period-topups", from, to], queryFn: () => query("vault_topups", "vault_user_id,amount,topup_date,vault_users(name)", "topup_date", from, to) });
   const periodSupplierPayments = useQuery({ queryKey: ["report-period-supplier-payments", from, to], queryFn: () => query("supplier_payments", "purchase_id,vault_user_id,amount,payment_date", "payment_date", from, to) });
+  const cashMovements = useQuery({ queryKey: ["report-vault-cash-movements"], queryFn: () => query("vault_cash_movements", "source_vault_user_id,destination_vault_user_id,amount,movement_type,movement_date,voided_at") });
+  const periodOwnerDistributions = useQuery({ queryKey: ["report-owner-distributions", from, to], queryFn: () => query("vault_cash_movements", "amount,movement_type,movement_date,voided_at", "movement_date", from, to) });
 
   const derived = useMemo(() => {
     const s = sales.data ?? [], p = purchases.data ?? [], ex = expenses.data ?? [], receipts = payments.data ?? [];
@@ -64,15 +66,19 @@ export function useAnalytics(from: string, to: string) {
       vaultsByPurchase.get(row.purchase_id)!.add(row.vault_user_id);
     }
     const splitIds = new Set([...vaultsByPurchase].filter(([, ids]) => ids.size > 1).map(([id]) => id));
-    const currentCashOnHand = (vaultUsers.data ?? []).reduce((total, user) => {
+    const vaultBalance = (user: any) => {
       const opening = Number(user.opening_balance);
       const added = (topups.data ?? []).filter((x) => x.vault_user_id === user.id).reduce((n, x) => n + Number(x.amount), 0);
       const received = (allPayments.data ?? []).filter((x) => x.vault_user_id === user.id).reduce((n, x) => n + Number(x.amount), 0);
       const purchaseSpend = (vaultPurchases.data ?? []).filter((x) => x.vault_user_id === user.id && !splitIds.has(x.id)).reduce((n, x) => n + Number(x.amount_paid), 0);
       const splitSpend = (supplierPayments.data ?? []).filter((x) => x.vault_user_id === user.id && x.purchase_id && splitIds.has(x.purchase_id)).reduce((n, x) => n + Number(x.amount), 0);
       const expenseSpend = (vaultExpenses.data ?? []).filter((x) => x.vault_user_id === user.id).reduce((n, x) => n + Number(x.amount), 0);
-      return total + opening + added + received - purchaseSpend - splitSpend - expenseSpend;
-    }, 0);
+      const movementIn = (cashMovements.data ?? []).filter((x:any) => !x.voided_at && x.destination_vault_user_id === user.id).reduce((n:number,x:any)=>n+Number(x.amount),0);
+      const movementOut = (cashMovements.data ?? []).filter((x:any) => !x.voided_at && x.source_vault_user_id === user.id).reduce((n:number,x:any)=>n+Number(x.amount),0);
+      return opening + added + received + movementIn - purchaseSpend - splitSpend - expenseSpend - movementOut;
+    };
+    const currentCashOnHand = (vaultUsers.data ?? []).filter((u:any)=>u.vault_type !== "owner_cash").reduce((total,user)=>total+vaultBalance(user),0);
+    const ownerCashBalance = (vaultUsers.data ?? []).filter((u:any)=>u.vault_type === "owner_cash").reduce((total,user)=>total+vaultBalance(user),0);
     const inventory = (products.data ?? []).map((row) => ({ ...row, inventoryValue: Number(row.current_stock) * Number(row.avg_cost) }));
     const inventoryAtCost = inventory.reduce((sum, row) => sum + row.inventoryValue, 0);
     const netWorkingCapital = currentCashOnHand + outstanding + inventoryAtCost - supplierPayables;
@@ -89,7 +95,8 @@ export function useAnalytics(from: string, to: string) {
     // the purchase date; genuine multi-vault splits use their linked payment
     // rows on the split payment date. The two representations never overlap.
     const attributedPurchaseSpend = p.filter((row:any)=>!splitIds.has(row.id)).reduce((n,row)=>n+Number(row.amount_paid),0) + (periodSupplierPayments.data ?? []).filter((row:any)=>row.purchase_id && splitIds.has(row.purchase_id)).reduce((n,row)=>n+Number(row.amount),0);
-    const netCashMovement = customerCashReceived + topupTotal - attributedPurchaseSpend - operatingExpenses - capitalExpenditure;
+    const ownerDistributions = (periodOwnerDistributions.data ?? []).filter((x:any)=>!x.voided_at && x.movement_type==="owner_distribution").reduce((n:number,x:any)=>n+Number(x.amount),0);
+    const netCashMovement = customerCashReceived + topupTotal - attributedPurchaseSpend - operatingExpenses - capitalExpenditure - ownerDistributions;
 
     const byRestaurant = new Map<string, { name: string; sales: number; cost: number; orders: number }>();
     const byCategory = new Map<string, { revenue: number; cost: number }>();
@@ -108,13 +115,13 @@ export function useAnalytics(from: string, to: string) {
     s.forEach((row) => { const day=dayMap.get(row.sale_date) ?? {sales:0,purchases:0}; day.sales += Number(row.grand_total); dayMap.set(row.sale_date,day); });
     p.forEach((row) => { const day=dayMap.get(row.purchase_date) ?? {sales:0,purchases:0}; day.purchases += Number(row.grand_total); dayMap.set(row.purchase_date,day); });
     trend.push(...[...dayMap].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,v])=>({date:date.slice(5),...v})));
-    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, operatingExpenses, capitalExpenditure, generalOperatingExpenses, salaries, totalCashExpenseOutflow, opexBreakdown, capexBreakdown, grossProfit, operatingProfit: grossProfit - operatingExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, attributedPurchaseSpend, netCashMovement,
+    return { totalSales, totalCost, totalPurchases, margin, orders: s.length, trend, byProduct, operatingExpenses, capitalExpenditure, generalOperatingExpenses, salaries, totalCashExpenseOutflow, opexBreakdown, capexBreakdown, grossProfit, operatingProfit: grossProfit - operatingExpenses, outstanding, supplierPayables, customerCashReceived, currentCashOnHand, ownerCashBalance, ownerDistributions, inventoryAtCost, netWorkingCapital, inventory, inventoryByCategory, restaurantReceivables, supplierPayableSummary, receiptMethods, topupTotal, attributedPurchaseSpend, netCashMovement,
       sales: s, purchases: p, expenses: ex, payments: receipts,
       byRestaurant: [...byRestaurant.values()].map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.sales - a.sales),
       byCategory: [...byCategory].map(([name, v]) => ({ name, ...v, profit: v.revenue - v.cost })).sort((a, b) => b.revenue - a.revenue),
     };
-  }, [sales.data, purchases.data, expenses.data, payments.data, allSales.data, allPurchases.data, products.data, vaultUsers.data, topups.data, vaultPurchases.data, vaultExpenses.data, allPayments.data, supplierPayments.data, periodTopups.data, periodSupplierPayments.data]);
+  }, [sales.data, purchases.data, expenses.data, payments.data, allSales.data, allPurchases.data, products.data, vaultUsers.data, topups.data, vaultPurchases.data, vaultExpenses.data, allPayments.data, supplierPayments.data, periodTopups.data, periodSupplierPayments.data, cashMovements.data, periodOwnerDistributions.data]);
 
-  const queries = [sales, purchases, expenses, payments, allSales, allPurchases, products, vaultUsers, topups, vaultPurchases, vaultExpenses, allPayments, supplierPayments, periodTopups, periodSupplierPayments];
+  const queries = [sales, purchases, expenses, payments, allSales, allPurchases, products, vaultUsers, topups, vaultPurchases, vaultExpenses, allPayments, supplierPayments, periodTopups, periodSupplierPayments, cashMovements, periodOwnerDistributions];
   return { ...derived, isLoading: queries.some((q) => q.isLoading) };
 }
