@@ -79,6 +79,7 @@ export function PaySupplierDialog({
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!vaultUserId) throw new Error("Paid From Vault is required");
       await paySupplier({
         supplierId,
         amount,
@@ -86,7 +87,7 @@ export function PaySupplierDialog({
         date,
         note,
         purchaseId: target === "fifo" ? undefined : target,
-        vaultUserId: vaultUserId || undefined,
+        vaultUserId,
       });
     },
     onSuccess: () => {
@@ -150,7 +151,7 @@ export function PaySupplierDialog({
           <div className="space-y-2">
             <Label>Paid From (Vault User)</Label>
             <Select value={vaultUserId} onValueChange={setVaultUserId}>
-              <SelectTrigger><SelectValue placeholder="Optional — deduct from vault balance" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger>
               <SelectContent>
                 {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
               </SelectContent>
@@ -165,7 +166,7 @@ export function PaySupplierDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0 || !vaultUserId}>
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record Payment
           </Button>
         </DialogFooter>

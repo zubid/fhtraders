@@ -11,6 +11,11 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 UPDATE public.vault_users SET vault_type = 'owner_cash'
 WHERE lower(btrim(name)) IN ('abd cash', 'imii cash') AND vault_type <> 'owner_cash';
 
+DO $$ BEGIN
+  ALTER TABLE public.vault_users ADD CONSTRAINT vault_users_owner_cash_zero_opening_check
+    CHECK (vault_type <> 'owner_cash' OR opening_balance = 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE TABLE IF NOT EXISTS public.vault_cash_movements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   movement_type text NOT NULL CHECK (movement_type IN ('internal_transfer', 'owner_distribution')),
@@ -57,6 +62,20 @@ RETURNS numeric LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
   FROM public.vault_users v WHERE v.id=p_vault_user_id;
 $$;
 
+CREATE OR REPLACE FUNCTION public.prevent_nonzero_vault_deactivation()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF OLD.is_active AND NOT NEW.is_active
+     AND abs(public.vault_available_balance(OLD.id)) > 0.005 THEN
+    RAISE EXCEPTION 'Transfer or distribute the remaining balance before deactivating this Vault.';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS prevent_nonzero_vault_deactivation ON public.vault_users;
+CREATE TRIGGER prevent_nonzero_vault_deactivation
+BEFORE UPDATE OF is_active ON public.vault_users
+FOR EACH ROW EXECUTE FUNCTION public.prevent_nonzero_vault_deactivation();
+
 CREATE OR REPLACE FUNCTION public.record_vault_cash_movement(
   p_movement_type text, p_source_vault_user_id uuid, p_destination_vault_user_id uuid,
   p_amount numeric, p_movement_date date DEFAULT CURRENT_DATE, p_note text DEFAULT NULL
@@ -65,6 +84,7 @@ DECLARE src public.vault_users; dst public.vault_users; result public.vault_cash
 BEGIN
   IF auth.uid() IS NULL OR NOT public.has_role(auth.uid(), 'admin') THEN RAISE EXCEPTION 'Admin access required'; END IF;
   IF p_amount IS NULL OR p_amount <= 0 THEN RAISE EXCEPTION 'Amount must be greater than zero'; END IF;
+  IF COALESCE(p_movement_date, CURRENT_DATE) > CURRENT_DATE THEN RAISE EXCEPTION 'Cash movements cannot be future dated'; END IF;
   IF p_source_vault_user_id = p_destination_vault_user_id THEN RAISE EXCEPTION 'Source and destination must differ'; END IF;
   SELECT * INTO src FROM public.vault_users WHERE id=p_source_vault_user_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Source Vault does not exist'; END IF;
@@ -85,13 +105,24 @@ END $$;
 
 CREATE OR REPLACE FUNCTION public.void_vault_cash_movement(p_movement_id uuid, p_reason text)
 RETURNS public.vault_cash_movements LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE result public.vault_cash_movements;
+DECLARE result public.vault_cash_movements; destination_balance numeric;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.has_role(auth.uid(), 'admin') THEN RAISE EXCEPTION 'Admin access required'; END IF;
   IF NULLIF(btrim(p_reason),'') IS NULL THEN RAISE EXCEPTION 'Void reason is required'; END IF;
   SELECT * INTO result FROM public.vault_cash_movements WHERE id=p_movement_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Cash movement does not exist'; END IF;
   IF result.voided_at IS NOT NULL THEN RAISE EXCEPTION 'Cash movement is already voided'; END IF;
+  -- Serialize against both movement creation and another void, then ensure removing
+  -- the original inflow cannot manufacture a negative destination balance.
+  PERFORM 1 FROM public.vault_users WHERE id=result.destination_vault_user_id FOR UPDATE;
+  destination_balance := public.vault_available_balance(result.destination_vault_user_id);
+  IF destination_balance < result.amount THEN
+    IF result.movement_type = 'internal_transfer' THEN
+      RAISE EXCEPTION 'This transfer cannot be voided because the destination Vault no longer has sufficient available cash. Record a compensating transfer instead.';
+    ELSE
+      RAISE EXCEPTION 'This distribution cannot be voided because the owner wallet no longer has sufficient available cash.';
+    END IF;
+  END IF;
   UPDATE public.vault_cash_movements SET voided_at=now(),voided_by=auth.uid(),void_reason=btrim(p_reason)
   WHERE id=p_movement_id RETURNING * INTO result;
   RETURN result;
@@ -101,9 +132,7 @@ ALTER TABLE public.vault_cash_movements ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Auth read vault_cash_movements" ON public.vault_cash_movements;
 CREATE POLICY "Auth read vault_cash_movements" ON public.vault_cash_movements FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Admin insert vault_cash_movements" ON public.vault_cash_movements;
-CREATE POLICY "Admin insert vault_cash_movements" ON public.vault_cash_movements FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(),'admin'));
 DROP POLICY IF EXISTS "Admin update vault_cash_movements" ON public.vault_cash_movements;
-CREATE POLICY "Admin update vault_cash_movements" ON public.vault_cash_movements FOR UPDATE TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
 
 DROP POLICY IF EXISTS "Auth manage vault_users" ON public.vault_users;
 DROP POLICY IF EXISTS "Admin manage vault_users" ON public.vault_users;
@@ -114,9 +143,10 @@ CREATE POLICY "Admin manage vault_topups" ON public.vault_topups FOR ALL TO auth
 USING (public.has_role(auth.uid(),'admin'))
 WITH CHECK (public.has_role(auth.uid(),'admin') AND EXISTS (SELECT 1 FROM public.vault_users v WHERE v.id=vault_user_id AND v.vault_type='business_cash'));
 
-REVOKE INSERT, UPDATE, DELETE ON public.vault_users, public.vault_topups, public.vault_cash_movements FROM authenticated;
+REVOKE ALL ON public.vault_cash_movements FROM PUBLIC, anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.vault_users, public.vault_topups FROM authenticated;
 GRANT SELECT ON public.vault_users, public.vault_topups, public.vault_cash_movements TO authenticated;
-GRANT INSERT, UPDATE ON public.vault_users, public.vault_topups, public.vault_cash_movements TO authenticated;
+GRANT INSERT, UPDATE ON public.vault_users, public.vault_topups TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vault_available_balance(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.record_vault_cash_movement(text,uuid,uuid,numeric,date,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.void_vault_cash_movement(uuid,text) TO authenticated;

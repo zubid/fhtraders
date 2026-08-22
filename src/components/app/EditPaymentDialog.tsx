@@ -62,9 +62,10 @@ export function EditPaymentDialog({
   const save = useMutation({
     mutationFn: async () => {
       if (!payment) return;
+      if (vaultUserId === "none") throw new Error("Received By Vault is required before saving changes");
       await updatePayment(payment.id, payment.restaurant_id, {
         amount, method, date, note,
-        vaultUserId: vaultUserId === "none" ? null : vaultUserId,
+        vaultUserId,
       });
     },
     onSuccess: () => {
@@ -113,7 +114,7 @@ export function EditPaymentDialog({
             <Select value={vaultUserId} onValueChange={setVaultUserId}>
               <SelectTrigger><SelectValue placeholder="Select vault user" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No vault user</SelectItem>
+                {vaultUserId === "none" && <SelectItem value="none" disabled>Missing Vault — select one to save</SelectItem>}
                 {(vaultUsers ?? []).map((v: any) => (
                   <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                 ))}
@@ -127,7 +128,7 @@ export function EditPaymentDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0 || vaultUserId === "none"}>
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes
           </Button>
         </DialogFooter>
