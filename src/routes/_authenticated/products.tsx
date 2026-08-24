@@ -71,6 +71,27 @@ function ProductsPage() {
       return data as Product[];
     },
   });
+  const { data: salePrices, isLoading: pricesLoading } = useQuery({
+    queryKey: ["catalog-sale-prices"],
+    enabled: catalogOpen,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sale_items")
+        .select("product_id,unit_price")
+        .gt("unit_price", 0);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const highestSalePrice = useMemo(() => {
+    const prices = new Map<string, number>();
+    for (const row of salePrices ?? []) {
+      const price = Number(row.unit_price);
+      if (price > (prices.get(row.product_id) ?? 0)) prices.set(row.product_id, price);
+    }
+    return prices;
+  }, [salePrices]);
 
   const filtered = useMemo(() => {
     let rows = data ?? [];
@@ -144,11 +165,12 @@ function ProductsPage() {
       .forEach((p) => {
         const name = p.categories?.name ?? "Other Items";
         if (!map.has(name)) map.set(name, { name, color: p.categories?.color ?? "#0f766e", items: [] });
-        map.get(name)!.items.push({ name: p.name, unit: p.unit, price: p.default_selling_price });
+        const historicalPrice = highestSalePrice.get(p.id) ?? 0;
+        const fallbackPrice = Number(p.default_selling_price) > 0 ? Number(p.default_selling_price) : 0;
+        map.get(name)!.items.push({ name: p.name, unit: p.unit, price: historicalPrice || fallbackPrice });
       });
     printCatalog([...map.values()].sort((a, b) => a.name.localeCompare(b.name)), {
       showPrices,
-      note: "Prices are indicative and subject to change. Please contact us for bulk quotations and daily rates.",
     });
     setCatalogOpen(false);
   };
@@ -288,16 +310,23 @@ function ProductsPage() {
       />
 
       <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Download Product Catalog</DialogTitle>
+            <DialogTitle>Product Catalog</DialogTitle>
             <DialogDescription>
-              A classic, branded catalog of all products grouped by category — ready to share with customers.
+              Generate a branded FH Traders catalog ready to print or share with customers.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Button onClick={() => buildCatalog(true)}>Catalog with prices</Button>
-            <Button variant="outline" onClick={() => buildCatalog(false)}>Catalog without prices</Button>
+          <div className="grid gap-3 py-2">
+            <Button className="h-auto items-start justify-start px-5 py-4 text-left" onClick={() => buildCatalog(true)} disabled={pricesLoading}>
+              <BookOpen className="mr-3 mt-0.5 h-5 w-5 shrink-0" />
+              <span><span className="block font-semibold tracking-wide">PRICED CATALOG</span><span className="mt-1 block text-xs font-normal opacity-85">Includes the highest recorded selling price for each product.</span></span>
+            </Button>
+            <Button variant="outline" className="h-auto items-start justify-start px-5 py-4 text-left" onClick={() => buildCatalog(false)}>
+              <BookOpen className="mr-3 mt-0.5 h-5 w-5 shrink-0" />
+              <span><span className="block font-semibold tracking-wide">PRODUCT CATALOG</span><span className="mt-1 block text-xs font-normal text-muted-foreground">Product list without pricing — useful for quotation enquiries.</span></span>
+            </Button>
+            {pricesLoading && <p className="text-center text-xs text-muted-foreground">Preparing catalog pricing…</p>}
           </div>
         </DialogContent>
       </Dialog>
