@@ -140,7 +140,7 @@ BEGIN
   IF p_source_vault_user_id = p_destination_vault_user_id THEN RAISE EXCEPTION 'Source and destination must differ'; END IF;
   SELECT * INTO src FROM public.vault_users WHERE id=p_source_vault_user_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Source Vault does not exist'; END IF;
-  SELECT * INTO dst FROM public.vault_users WHERE id=p_destination_vault_user_id;
+  SELECT * INTO dst FROM public.vault_users WHERE id=p_destination_vault_user_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Destination Vault does not exist'; END IF;
   IF NOT src.is_active OR NOT dst.is_active THEN RAISE EXCEPTION 'Source and destination Vaults must be active'; END IF;
   IF p_movement_type='internal_transfer' THEN
@@ -199,6 +199,9 @@ REVOKE ALL ON public.vault_cash_movements FROM PUBLIC, anon, authenticated;
 REVOKE INSERT, UPDATE, DELETE ON public.vault_users, public.vault_topups FROM authenticated;
 GRANT SELECT ON public.vault_users, public.vault_topups, public.vault_cash_movements TO authenticated;
 GRANT INSERT, UPDATE ON public.vault_users, public.vault_topups TO authenticated;
+REVOKE ALL ON FUNCTION public.vault_available_balance(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.record_vault_cash_movement(text,uuid,uuid,numeric,date,text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.void_vault_cash_movement(uuid,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.vault_available_balance(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.record_vault_cash_movement(text,uuid,uuid,numeric,date,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.void_vault_cash_movement(uuid,text) TO authenticated;
