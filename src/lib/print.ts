@@ -216,79 +216,83 @@ export function printReport(opts: {
   render(title, inner);
 }
 
-/** Classic, presentation-grade product catalog for customers. */
+/** Modern, print-ready customer product catalog. */
 export function printCatalog(
   groups: { name: string; color?: string; items: any[] }[],
   opts?: { showPrices?: boolean; note?: string },
 ) {
   const b = getBranding();
   const showPrices = opts?.showPrices !== false;
-  const logo = b.logo_url ? `<img src="${esc(b.logo_url)}" alt="logo"/>` : "";
-  const contactBits = [b.address, b.phone, b.email].filter(Boolean).map(esc).join(" &nbsp;·&nbsp; ");
+  const logo = b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.business_name)} logo"/>` : "";
+  const contactBits = [b.address, b.phone, b.email].filter(Boolean).map(esc).join(" · ");
+  const populatedGroups = groups.filter((group) => group.items.length > 0);
+  const productCount = populatedGroups.reduce((total, group) => total + group.items.length, 0);
+  const catalogLabel = showPrices ? "Priced Catalog" : "Product Catalog";
+  const pricingNote = showPrices
+    ? "Prices are reference selling prices and may vary based on quantity, market conditions and order requirements. Contact FH Traders for current bulk quotations."
+    : "Contact FH Traders for current pricing and bulk quotations.";
 
-  const sections = groups
-    .filter((g) => g.items.length > 0)
-    .map(
-      (g) => `
-      <section class="cat">
-        <h2 class="cat-title"><span class="dot" style="background:${esc(g.color ?? "#0f766e")}"></span>${esc(g.name)}</h2>
-        <table>
-          <thead><tr><th>Item</th><th>Unit</th>${showPrices ? `<th class="r">Price</th>` : ""}</tr></thead>
-          <tbody>
-            ${g.items
-              .map(
-                (p: any) => `<tr>
-                  <td class="item">${esc(p.name)}</td>
-                  <td class="unit">${esc(p.unit)}</td>
-                  ${showPrices ? `<td class="r">${Number(p.price) > 0 ? formatCurrency(p.price) : "On request"}</td>` : ""}
-                </tr>`,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </section>`,
-    )
-    .join("");
+  const sections = populatedGroups.map((group) => `
+    <section class="category">
+      <div class="category-heading" style="border-left-color:${esc(group.color ?? "#0f766e")}">
+        <h2>${esc(group.name)}</h2>
+      </div>
+      <table>
+        <thead><tr><th>Product</th><th class="unit-col">Unit</th>${showPrices ? `<th class="price-col">Price</th>` : ""}</tr></thead>
+        <tbody>${group.items.map((product: any) => `
+          <tr>
+            <td class="product-name">${esc(product.name)}</td>
+            <td class="unit-col">${esc(product.unit)}</td>
+            ${showPrices ? `<td class="price-col">${Number(product.price) > 0 ? formatCurrency(product.price) : `<span class="request">On request</span>`}</td>` : ""}
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </section>`).join("");
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(b.business_name)} — Product Catalog</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(b.business_name)} — ${catalogLabel}</title>
   <style>
     *{box-sizing:border-box}
-    body{font-family:Georgia,'Times New Roman',serif;color:#1f2937;margin:0;padding:40px;max-width:860px;margin:auto;background:#fff}
-    .cover{text-align:center;border:2px solid #0f766e;border-radius:6px;padding:28px 24px;position:relative}
-    .cover:after{content:"";position:absolute;inset:6px;border:1px solid #0f766e55;border-radius:4px;pointer-events:none}
-    .cover img{height:70px;object-fit:contain;margin-bottom:10px}
-    .cover h1{font-size:34px;letter-spacing:2px;margin:6px 0 2px;color:#0f766e;text-transform:uppercase}
-    .cover .tag{font-style:italic;color:#475569;font-size:14px}
-    .rule{width:90px;height:2px;background:#0f766e;margin:14px auto}
-    .cover .kicker{font-size:12px;letter-spacing:5px;text-transform:uppercase;color:#94a3b8}
-    .cover .contact{margin-top:12px;font-size:12px;color:#64748b;font-family:'Segoe UI',Arial,sans-serif}
-    .note{margin:22px 0 0;text-align:center;font-style:italic;color:#475569;font-size:13px}
-    .cat{margin-top:30px;page-break-inside:avoid}
-    .cat-title{font-size:18px;letter-spacing:1px;text-transform:uppercase;color:#0f172a;border-bottom:2px solid #0f766e;padding-bottom:6px;margin:0 0 10px;display:flex;align-items:center;gap:9px}
-    .dot{display:inline-block;height:11px;width:11px;border-radius:99px}
-    table{width:100%;border-collapse:collapse}
-    th{text-align:left;font-family:'Segoe UI',Arial,sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#64748b;padding:6px 8px;border-bottom:1px solid #cbd5e1}
-    td{padding:7px 8px;font-size:13.5px;border-bottom:1px dotted #e2e8f0}
-    tr:nth-child(even) td{background:#f8fafc}
-    .item{font-weight:600}
-    .unit{color:#64748b;font-size:12.5px;font-family:'Segoe UI',Arial,sans-serif}
-    .r{text-align:right}
-    .foot{margin-top:40px;border-top:1px solid #cbd5e1;padding-top:14px;text-align:center;color:#64748b;font-size:12px}
-    @media print{body{padding:16px}}
+    @page{size:A4;margin:14mm 14mm 16mm}
+    body{font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;color:#172033;margin:0;background:#fff;font-size:12px;line-height:1.45}
+    .catalog-header{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:start;padding-bottom:15px;border-bottom:3px solid #0f766e}
+    .identity{display:flex;align-items:center;gap:14px;min-width:0}
+    .identity img{width:64px;height:64px;object-fit:contain;border-radius:8px}
+    .business-name{margin:0;color:#0f766e;font-size:24px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;line-height:1.1}
+    .tagline{margin-top:4px;color:#536171;font-size:12px;font-weight:500}
+    .document{text-align:right;white-space:nowrap}
+    .document h1{margin:0;font-size:19px;letter-spacing:1.6px;text-transform:uppercase;color:#172033}
+    .document-type{margin-top:3px;color:#0f766e;font-weight:700}
+    .generated{margin-top:3px;color:#697586;font-size:11px}
+    .contact{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;padding:9px 12px;background:#f1f7f6;border-left:3px solid #0f766e;color:#465466;font-size:11px}
+    .contact-person{font-weight:650;color:#243244}
+    .summary{display:flex;gap:18px;margin:16px 0 4px;color:#697586;font-size:11px}
+    .summary strong{color:#172033;font-size:13px}
+    .category{margin-top:20px;break-inside:auto;page-break-inside:auto}
+    .category-heading{border-left:4px solid #0f766e;border-bottom:1px solid #b9d4d0;padding:4px 0 5px 9px;margin-bottom:6px;break-after:avoid;page-break-after:avoid}
+    .category-heading h2{margin:0;font-size:13px;line-height:1.25;letter-spacing:1px;text-transform:uppercase;color:#173b38}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    thead{display:table-header-group}
+    th{padding:6px 9px;background:#eaf3f2;color:#334b49;text-align:left;text-transform:uppercase;letter-spacing:.65px;font-size:9.5px;font-weight:750;border-bottom:1px solid #b9d4d0}
+    td{padding:7px 9px;border-bottom:1px solid #e4e9ee;vertical-align:middle}
+    tbody tr{break-inside:avoid;page-break-inside:avoid}
+    tbody tr:nth-child(even){background:#f8fafb}
+    .product-name{font-weight:600;color:#172033}
+    .unit-col{width:${showPrices ? "20%" : "30%"};color:#647181}
+    .price-col{width:28%;text-align:right;font-weight:750;color:#0b625b;white-space:nowrap}
+    .request{color:#6b7280;font-style:italic;font-weight:500}
+    .catalog-note{margin-top:22px;padding:10px 12px;border:1px solid #cddbd9;background:#f8fbfa;color:#4a5968;font-size:10.5px;break-inside:avoid}
+    .footer{margin-top:18px;padding-top:9px;border-top:1px solid #d9e1e7;text-align:center;color:#718096;font-size:10px;break-inside:avoid}
+    @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.category{margin-top:16px}}
   </style></head><body>
-    <div class="cover">
-      ${logo}
-      <div class="kicker">Product Catalog</div>
-      <h1>${esc(b.business_name)}</h1>
-      <div class="rule"></div>
-      <div class="tag">${esc(b.business_tagline)}</div>
-      ${contactBits ? `<div class="contact">${contactBits}</div>` : ""}
-      ${b.contact_person ? `<div class="contact"><strong>Contact:</strong> ${esc(b.contact_person)}</div>` : ""}
-      <div class="contact">${esc(formatDate(new Date()))}</div>
-    </div>
-    ${opts?.note ? `<p class="note">${esc(opts.note)}</p>` : ""}
-    ${sections || `<p class="note">No products to display.</p>`}
-    <div class="foot">${esc(b.invoice_footer)}</div>
+    <header class="catalog-header">
+      <div class="identity">${logo}<div><h1 class="business-name">${esc(b.business_name)}</h1><div class="tagline">${esc(b.business_tagline)}</div></div></div>
+      <div class="document"><h1>Product Catalog</h1><div class="document-type">${catalogLabel}</div><div class="generated">Generated: ${esc(formatDate(new Date()))}</div></div>
+    </header>
+    <div class="contact">${contactBits ? `<span>${contactBits}</span>` : ""}${b.contact_person ? `<span class="contact-person">Contact: ${esc(b.contact_person)}</span>` : ""}</div>
+    <div class="summary"><span><strong>${productCount}</strong> Products</span><span><strong>${populatedGroups.length}</strong> Categories</span></div>
+    ${sections || `<p class="catalog-note">No products to display.</p>`}
+    <div class="catalog-note">${esc(opts?.note ?? pricingNote)}</div>
+    <footer class="footer">${esc(b.invoice_footer)}</footer>
   </body></html>`;
 
   const w = window.open("", "_blank", "width=900,height=1000");
