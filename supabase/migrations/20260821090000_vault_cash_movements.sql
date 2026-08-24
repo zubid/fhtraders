@@ -7,6 +7,58 @@ DO $$ BEGIN
     CHECK (vault_type IN ('business_cash', 'owner_cash'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Historical rows are deliberately not backfilled. New rows, and any historical
+-- row that is subsequently edited, must point at an active Business Cash Vault.
+CREATE OR REPLACE FUNCTION public.require_active_business_cash_vault()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF NEW.vault_user_id IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.vault_users v
+    WHERE v.id = NEW.vault_user_id
+      AND v.is_active
+      AND v.vault_type = 'business_cash'
+  ) THEN
+    RAISE EXCEPTION 'A valid active Business Cash Vault is required for this financial transaction.';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS require_business_vault_for_payments ON public.payments;
+CREATE TRIGGER require_business_vault_for_payments
+BEFORE INSERT OR UPDATE ON public.payments
+FOR EACH ROW EXECUTE FUNCTION public.require_active_business_cash_vault();
+
+DROP TRIGGER IF EXISTS require_business_vault_for_supplier_payments ON public.supplier_payments;
+CREATE TRIGGER require_business_vault_for_supplier_payments
+BEFORE INSERT OR UPDATE ON public.supplier_payments
+FOR EACH ROW EXECUTE FUNCTION public.require_active_business_cash_vault();
+
+DROP TRIGGER IF EXISTS require_business_vault_for_expenses ON public.expenses;
+CREATE TRIGGER require_business_vault_for_expenses
+BEFORE INSERT OR UPDATE ON public.expenses
+FOR EACH ROW EXECUTE FUNCTION public.require_active_business_cash_vault();
+
+CREATE OR REPLACE FUNCTION public.require_business_vault_for_paid_purchase()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF COALESCE(NEW.amount_paid, 0) > 0 AND (
+    NEW.vault_user_id IS NULL OR NOT EXISTS (
+      SELECT 1 FROM public.vault_users v
+      WHERE v.id = NEW.vault_user_id
+        AND v.is_active
+        AND v.vault_type = 'business_cash'
+    )
+  ) THEN
+    RAISE EXCEPTION 'A valid active Business Cash Vault is required when a Purchase has a payment.';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS require_business_vault_for_paid_purchase ON public.purchases;
+CREATE TRIGGER require_business_vault_for_paid_purchase
+BEFORE INSERT OR UPDATE ON public.purchases
+FOR EACH ROW EXECUTE FUNCTION public.require_business_vault_for_paid_purchase();
+
 -- Names are production data, unlike deployment-specific UUIDs. Opening balances are untouched.
 UPDATE public.vault_users SET vault_type = 'owner_cash'
 WHERE lower(btrim(name)) IN ('abd cash', 'imii cash') AND vault_type <> 'owner_cash';
