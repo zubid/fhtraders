@@ -58,6 +58,14 @@ function VaultDetail() {
     queryFn: async () =>
       ((await (supabase.from("supplier_payments" as any) as any).select("purchase_id,vault_user_id").not("vault_user_id", "is", null)).data ?? []) as any[],
   });
+  const { data: movements } = useQuery({
+    queryKey: ["vault_cash_movements", id],
+    queryFn: async () =>
+      ((await (supabase.from("vault_cash_movements" as any) as any)
+        .select("*,source:vault_users!vault_cash_movements_source_vault_user_id_fkey(name),destination:vault_users!vault_cash_movements_destination_vault_user_id_fkey(name)")
+        .or(`source_vault_user_id.eq.${id},destination_vault_user_id.eq.${id}`)
+        .order("movement_date", { ascending: false })).data ?? []) as any[],
+  });
 
   const splitPurchaseIds = useMemo(() => {
     const vaultsByPurchase = new Map<string, Set<string>>();
@@ -85,6 +93,9 @@ function VaultDetail() {
     () => (supPay ?? []).filter((s: any) => inRange(s.payment_date) && s.purchase_id && splitPurchaseIds.has(s.purchase_id)),
     [supPay, from, to, splitPurchaseIds],
   );
+  const fMovements = useMemo(() => (movements ?? []).filter((m: any) => inRange(m.movement_date)), [movements, from, to]);
+  const activeMovementIn = fMovements.filter((m: any) => !m.voided_at && m.destination_vault_user_id === id).reduce((s: number,m: any)=>s+Number(m.amount),0);
+  const activeMovementOut = fMovements.filter((m: any) => !m.voided_at && m.source_vault_user_id === id).reduce((s: number,m: any)=>s+Number(m.amount),0);
 
   const sumTop = fTop.reduce((s, t) => s + Number(t.amount), 0);
   const sumPur = fPur.reduce((s: number, p: any) => s + Number(p.amount_paid ?? 0), 0);
@@ -92,7 +103,7 @@ function VaultDetail() {
   const sumCP = fCP.reduce((s: number, c: any) => s + Number(c.amount), 0);
   const sumSplitPay = fSP.reduce((s: number, x: any) => s + Number(x.amount), 0);
   const opening = Number(user?.opening_balance ?? 0);
-  const balance = opening + sumTop + sumCP - sumPur - sumSplitPay - sumExp;
+  const balance = opening + sumTop + sumCP + activeMovementIn - sumPur - sumSplitPay - sumExp - activeMovementOut;
 
   const ledger = useMemo(() => {
     const rows: any[] = [];
@@ -101,9 +112,10 @@ function VaultDetail() {
     fPur.forEach((p: any) => rows.push({ date: p.purchase_date, kind: "Purchase", ref: `${p.reference_no} · ${p.suppliers?.name ?? ""}`, inflow: 0, outflow: Number(p.amount_paid ?? 0) }));
     fSP.forEach((s: any) => rows.push({ date: s.payment_date, kind: "Purchase Split", ref: s.suppliers?.name ?? "-", inflow: 0, outflow: Number(s.amount) }));
     fExp.forEach((e: any) => rows.push({ date: e.expense_date, kind: e.type === "salary" ? "Salary" : "Expense", ref: e.type === "salary" ? (e.employees?.name ?? "-") : (e.expense_categories?.name ?? e.description ?? "-"), inflow: 0, outflow: Number(e.amount) }));
+    fMovements.filter((m:any)=>!m.voided_at).forEach((m:any) => { const incoming=m.destination_vault_user_id===id; rows.push({date:m.movement_date,kind:m.movement_type==="owner_distribution"?(incoming?"Owner Distribution Received":"Owner Distribution"):(incoming?"Internal Transfer In":"Internal Transfer Out"),ref:incoming?(m.source?.name??"-"):(m.destination?.name??"-"),inflow:incoming?Number(m.amount):0,outflow:incoming?0:Number(m.amount)}); });
     rows.sort((a, b) => (a.date < b.date ? 1 : -1));
     return rows;
-  }, [fTop, fPur, fExp, fCP, fSP]);
+  }, [fTop, fPur, fExp, fCP, fSP, fMovements, id]);
 
   const ledgerTotalIn = ledger.reduce((sum, row) => sum + Number(row.inflow), 0);
   const ledgerTotalOut = ledger.reduce((sum, row) => sum + Number(row.outflow), 0);
@@ -129,6 +141,8 @@ function VaultDetail() {
         { label: "Opening", value: formatCurrency(opening) },
         { label: "Top-ups", value: formatCurrency(sumTop) },
         { label: "Restaurant Receipts", value: formatCurrency(sumCP) },
+        { label: "Cash Movement In", value: formatCurrency(activeMovementIn) },
+        { label: "Cash Movement Out", value: formatCurrency(activeMovementOut) },
         { label: "Purchases", value: formatCurrency(sumPur + sumSplitPay) },
         { label: "Expenses", value: formatCurrency(sumExp) },
         { label: "Balance", value: formatCurrency(balance) },
@@ -169,6 +183,7 @@ function VaultDetail() {
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Opening</p><p className="mt-1 text-lg font-bold">{formatCurrency(opening)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Top-ups</p><p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumTop)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Restaurant Receipts</p><p className="mt-1 text-lg font-bold text-success">{formatCurrency(sumCP)}</p></CardContent></Card>
+        <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Cash Movement In / Out</p><p className="mt-1 text-lg font-bold">{formatCurrency(activeMovementIn)} / {formatCurrency(activeMovementOut)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Purchases</p><p className="mt-1 text-lg font-bold text-destructive">{formatCurrency(sumPur + sumSplitPay)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Expenses</p><p className="mt-1 text-lg font-bold text-destructive">{formatCurrency(sumExp)}</p></CardContent></Card>
         <Card><CardContent className="pt-6"><p className="text-xs text-muted-foreground">Balance</p><p className={`mt-1 text-lg font-bold ${balance < 0 ? "text-destructive" : "text-success"}`}>{formatCurrency(balance)}</p></CardContent></Card>
@@ -181,6 +196,7 @@ function VaultDetail() {
           <TabsTrigger value="receipts">Receipts</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="topups">Top-ups</TabsTrigger>
+          <TabsTrigger value="movements">Cash Movements</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ledger">
@@ -208,6 +224,8 @@ function VaultDetail() {
             )}
           </Card>
         </TabsContent>
+
+        <TabsContent value="movements"><Card className="p-4"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Counterparty</TableHead><TableHead>Note</TableHead><TableHead className="text-right">In</TableHead><TableHead className="text-right">Out</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{fMovements.map((m:any)=>{const incoming=m.destination_vault_user_id===id;return <TableRow key={m.id}><TableCell>{formatDate(m.movement_date)}</TableCell><TableCell>{m.movement_type==="owner_distribution"?"Owner Distribution":"Internal Transfer"}</TableCell><TableCell>{incoming?m.source?.name:m.destination?.name}</TableCell><TableCell>{m.note??m.void_reason??"-"}</TableCell><TableCell className="text-right text-success">{incoming&&!m.voided_at?formatCurrency(m.amount):"-"}</TableCell><TableCell className="text-right text-destructive">{!incoming&&!m.voided_at?formatCurrency(m.amount):"-"}</TableCell><TableCell>{m.voided_at?"Voided":"Active"}</TableCell></TableRow>})}</TableBody></Table></Card></TabsContent>
 
         <TabsContent value="purchases">
           <Card className="p-4">

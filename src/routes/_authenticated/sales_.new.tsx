@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2, Search, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { METHOD_LABELS, PAYMENT_METHODS, recordPayment } from "@/lib/credit";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { formatCurrency, formatNumber } from "@/lib/format";
@@ -30,6 +31,8 @@ function NewSale() {
   const [tax, setTax] = useState(0);
   const [notes, setNotes] = useState("");
   const [received, setReceived] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [vaultUserId, setVaultUserId] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [term, setTerm] = useState("");
   const defaultDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -45,6 +48,21 @@ function NewSale() {
     queryFn: async () =>
       (await supabase.from("products").select("id,name,unit,sku,current_stock,avg_cost,categories(name)").order("name")).data ?? [],
   });
+  const { data: vaultUsers } = useQuery({
+    queryKey: ["vault_users_active"],
+    queryFn: async () =>
+      ((await (supabase.from("vault_users" as any) as any)
+        .select("id,name")
+        .eq("is_active", true)
+        .eq("vault_type", "business_cash")
+        .order("name")).data ?? []) as any[],
+  });
+
+  const defaultReceiptVault = useMemo(
+    () => (vaultUsers ?? []).find((v: any) => v.name.trim().toLowerCase() === "profit or rotator vault")?.id ?? "",
+    [vaultUsers],
+  );
+  const receiptVaultId = vaultUserId || defaultReceiptVault;
 
   const results = useMemo(() => {
     if (!term.trim()) return [];
@@ -90,9 +108,13 @@ function NewSale() {
       if (lines.some((l) => l.unit_price <= 0)) throw new Error("Selling price must be greater than zero for every item.");
       if (hasOverstock) throw new Error("One or more items exceed available stock.");
       if (hasBelowCost) throw new Error("Selling price cannot be lower than product cost.");
+      if (received < 0) throw new Error("Initial Payment cannot be negative.");
+      if (received > grandTotal) throw new Error("Initial Payment cannot exceed the Grand Total.");
+      if (received > 0 && !paymentMethod) throw new Error("Select a Payment Method.");
+      if (received > 0 && !receiptVaultId) throw new Error("Select the Business Cash Vault that received this payment.");
       const { data: sale, error: sErr } = await supabase
         .from("sales")
-        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, amount_received: Math.min(received, grandTotal), notes: notes || null })
+        .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, amount_received: 0, notes: notes || null })
         .select("id").single();
       if (sErr) throw sErr;
       const items = lines.map((l) => ({
@@ -105,10 +127,30 @@ function NewSale() {
       const { data: saved } = await supabase.from("sale_items").select("quantity,cost_price").eq("sale_id", sale.id);
       const totalCost = (saved ?? []).reduce((s, x) => s + Number(x.quantity) * Number(x.cost_price), 0);
       await supabase.from("sales").update({ total_cost: totalCost }).eq("id", sale.id);
+      if (received > 0) {
+        try {
+          await recordPayment({
+            restaurantId,
+            saleId: sale.id,
+            amount: received,
+            method: paymentMethod,
+            date,
+            note: "Initial payment at sale",
+            vaultUserId: receiptVaultId,
+          });
+        } catch {
+          return { paymentWarning: true };
+        }
+      }
+      return { paymentWarning: false };
     },
-    onSuccess: () => {
+    onSuccess: ({ paymentWarning }) => {
       qc.invalidateQueries();
-      toast.success("Sale saved · stock deducted");
+      if (paymentWarning) {
+        toast.error("Sale was saved, but the initial payment could not be recorded. The Sale remains outstanding. Record the payment from Restaurant Payments.", { duration: 12000 });
+      } else {
+        toast.success("Sale saved · stock deducted");
+      }
       allowNavigation();
       navigate({ to: "/sales" });
     },
@@ -217,10 +259,14 @@ function NewSale() {
             <div className="space-y-2"><Label>Tax</Label><Input type="number" step="0.01" value={tax} onChange={(e) => setTax(+e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
             <div className="space-y-2">
-              <Label>Amount Received (optional)</Label>
+              <Label>Initial Payment Received</Label>
               <Input type="number" min="0" step="0.01" value={received} onChange={(e) => setReceived(+e.target.value)} />
               <p className="text-xs text-muted-foreground">Leave 0 to record the full amount as credit.</p>
             </div>
+            {received > 0 && <>
+              <div className="space-y-2"><Label>Payment Method *</Label><Select value={paymentMethod} onValueChange={setPaymentMethod}><SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger><SelectContent>{PAYMENT_METHODS.map((method) => <SelectItem key={method} value={method}>{METHOD_LABELS[method]}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Received By (Business Vault) *</Label><Select value={receiptVaultId} onValueChange={setVaultUserId}><SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger><SelectContent>{(vaultUsers ?? []).map((vault: any) => <SelectItem key={vault.id} value={vault.id}>{vault.name}</SelectItem>)}</SelectContent></Select></div>
+            </>}
             <div className="space-y-1 border-t border-border pt-4 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
               <div className="flex justify-between"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>
@@ -229,7 +275,7 @@ function NewSale() {
               <div className="flex justify-between text-success"><span>Received</span><span>{formatCurrency(Math.min(received, grandTotal))}</span></div>
               <div className="flex justify-between font-semibold text-destructive"><span>Balance (credit)</span><span>{formatCurrency(Math.max(0, grandTotal - received))}</span></div>
             </div>
-            <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || hasOverstock}>
+            <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || hasOverstock || received < 0 || received > grandTotal || (received > 0 && (!paymentMethod || !receiptVaultId))}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Sale
             </Button>
           </CardContent>

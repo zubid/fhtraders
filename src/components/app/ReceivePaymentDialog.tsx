@@ -54,7 +54,7 @@ export function ReceivePaymentDialog({
     queryKey: ["vault_users_active"],
     enabled: open,
     queryFn: async () =>
-      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).order("name")).data ?? []) as any[],
+      ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
 
   const outstanding = useMemo(
@@ -73,12 +73,14 @@ export function ReceivePaymentDialog({
       setMethod("cash");
       setNote("");
       setDate(new Date().toISOString().slice(0, 10));
-      setVaultUserId("");
+      const rotator = (vaultUsers ?? []).find((v: any) => v.name.trim().toLowerCase() === "profit or rotator vault");
+      setVaultUserId(rotator?.id ?? "");
     }
-  }, [open, presetSaleId]);
+  }, [open, presetSaleId, vaultUsers]);
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!vaultUserId) throw new Error("Received By Vault is required");
       await recordPayment({
         restaurantId,
         amount,
@@ -86,7 +88,7 @@ export function ReceivePaymentDialog({
         date,
         note,
         saleId: target === "fifo" ? undefined : target,
-        vaultUserId: vaultUserId || undefined,
+        vaultUserId,
       });
     },
     onSuccess: () => {
@@ -150,7 +152,7 @@ export function ReceivePaymentDialog({
           <div className="space-y-2">
             <Label>Received By (Vault User)</Label>
             <Select value={vaultUserId} onValueChange={setVaultUserId}>
-              <SelectTrigger><SelectValue placeholder="Optional — add to vault balance" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger>
               <SelectContent>
                 {(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
               </SelectContent>
@@ -165,7 +167,7 @@ export function ReceivePaymentDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0 || !vaultUserId}>
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record Payment
           </Button>
         </DialogFooter>

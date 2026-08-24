@@ -129,14 +129,15 @@ export async function recordPayment(opts: {
   date: string;
   note?: string;
   saleId?: string;
-  vaultUserId?: string;
+  vaultUserId: string;
 }) {
   const { restaurantId, amount, method, date, note, saleId, vaultUserId } = opts;
   if (amount <= 0) throw new Error("Amount must be greater than zero");
+  if (!vaultUserId) throw new Error("A Business Cash Vault is required for every new Restaurant Payment");
 
   const { data: userData } = await supabase.auth.getUser();
 
-  const { error: pErr } = await (supabase.from("payments") as any).insert({
+  const { data: payment, error: pErr } = await (supabase.from("payments") as any).insert({
     restaurant_id: restaurantId,
     sale_id: saleId ?? null,
     amount,
@@ -144,11 +145,20 @@ export async function recordPayment(opts: {
     payment_date: date,
     note: note || null,
     created_by: userData.user?.id ?? null,
-    vault_user_id: vaultUserId || null,
-  });
+    vault_user_id: vaultUserId,
+  }).select("id").single();
   if (pErr) throw pErr;
 
-  await recomputeRestaurantBalances(restaurantId);
+  try {
+    await recomputeRestaurantBalances(restaurantId);
+  } catch (error) {
+    // Do not leave a ledger row whose corresponding sale balance was not rebuilt.
+    // This compensates for the client workflow not being a database transaction.
+    const { error: rollbackError } = await supabase.from("payments").delete().eq("id", payment.id);
+    if (rollbackError) throw new Error(`Payment balance recomputation failed and the payment could not be rolled back: ${rollbackError.message}`);
+    await recomputeRestaurantBalances(restaurantId);
+    throw error;
+  }
 }
 
 /** Delete a payment from the ledger, then recompute balances for the restaurant. */
