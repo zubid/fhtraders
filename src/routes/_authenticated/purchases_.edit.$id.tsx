@@ -31,6 +31,7 @@ function EditPurchase() {
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [initialPaymentWarning, setInitialPaymentWarning] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const baseline = useRef("");
 
@@ -81,6 +82,14 @@ function EditPurchase() {
       notes: purchase.notes ?? "", lines: loadedLines });
   }, [purchase]);
 
+  useEffect(() => {
+    const key = `purchase-initial-payment-warning:${id}`;
+    if (sessionStorage.getItem(key)) {
+      sessionStorage.removeItem(key);
+      setInitialPaymentWarning(true);
+    }
+  }, [id]);
+
   const addLine = (p: { id: string; name: string; unit: string }) => {
     if (lines.some((l) => l.product_id === p.id)) return;
     setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0 }]);
@@ -96,6 +105,7 @@ function EditPurchase() {
   const balanceDue = Math.max(0, storedGrandTotal - alreadyPaid);
   const linkedPaymentTotal = (paySplits ?? []).reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
   const requiresReconciliation = linkedPaymentTotal > alreadyPaid + 0.01;
+  const historicallyOverpaid = alreadyPaid > storedGrandTotal + 0.01;
   const hasPaymentHistory = (paySplits ?? []).length > 0;
 
   const save = useMutation({
@@ -106,7 +116,12 @@ function EditPurchase() {
       if (lines.some((line) => line.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
       if (lines.some((line) => line.unit_price <= 0)) throw new Error("Unit price must be greater than zero for every item.");
       if (hasPaymentHistory && supplierId !== purchase.supplier_id) throw new Error("Supplier cannot be changed after payments have been recorded.");
-      if (grandTotal + 0.001 < alreadyPaid) throw new Error("Grand total cannot be less than the amount already paid.");
+      if (historicallyOverpaid && grandTotal + 0.001 < storedGrandTotal) {
+        throw new Error("Grand Total cannot be lower than its current value while this Purchase requires reconciliation.");
+      }
+      if (!historicallyOverpaid && grandTotal + 0.001 < alreadyPaid) {
+        throw new Error("Grand Total cannot be lower than the amount already paid.");
+      }
       // Reverse & delete existing items (triggers restock)
       const { error: dErr } = await supabase.from("purchase_items").delete().eq("purchase_id", id);
       if (dErr) throw dErr;
@@ -187,6 +202,12 @@ function EditPurchase() {
         <Card>
           <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
           <CardContent className="space-y-3">
+            {initialPaymentWarning && (
+              <div className="rounded-md border border-warning bg-warning/10 p-3 text-sm">
+                <AlertTriangle className="mb-2 h-5 w-5 text-warning" />
+                Purchase was saved, but one or more initial payments could not be recorded. Review the payment summary and record the remaining payment separately.
+              </div>
+            )}
             <div className="flex justify-between"><span>Grand Total</span><strong>{formatCurrency(storedGrandTotal)}</strong></div>
             <div className="flex justify-between"><span>Already Paid</span><strong>{formatCurrency(alreadyPaid)}</strong></div>
             <div className="flex justify-between border-t pt-3"><span>Balance Due</span><strong>{formatCurrency(balanceDue)}</strong></div>
@@ -194,6 +215,12 @@ function EditPurchase() {
               <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertTriangle className="mb-2 h-5 w-5" />
                 Payment ledger requires reconciliation. Linked payment records exceed the Purchase's recorded paid amount. Do not record another payment until this Purchase is reviewed.
+              </div>
+            )}
+            {historicallyOverpaid && (
+              <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="mb-2 h-5 w-5" />
+                This Purchase is historically overpaid and requires reconciliation. Paid amount and payment history have not been changed.
               </div>
             )}
             {balanceDue <= 0 ? (

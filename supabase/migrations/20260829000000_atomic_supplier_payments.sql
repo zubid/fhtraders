@@ -155,3 +155,8 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.record_supplier_payment(uuid,numeric,text,date,text,uuid,uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.record_supplier_payment(uuid,numeric,text,date,text,uuid,uuid) TO authenticated;
+
+-- Ledger writes are only allowed through audited database code such as the
+-- SECURITY DEFINER RPC above. History remains readable to authenticated users.
+REVOKE INSERT, UPDATE, DELETE ON public.supplier_payments FROM anon, authenticated;
+GRANT SELECT ON public.supplier_payments TO authenticated;
