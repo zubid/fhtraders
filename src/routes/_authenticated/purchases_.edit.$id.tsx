@@ -2,11 +2,11 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Trash2, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProductSearchPicker } from "@/components/app/ProductSearchPicker";
+import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
 
 export const Route = createFileRoute("/_authenticated/purchases_/edit/$id")({
   component: EditPurchase,
@@ -29,17 +30,13 @@ function EditPurchase() {
   const [supplierId, setSupplierId] = useState("");
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [vaultUserId, setVaultUserId] = useState("");
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const baseline = useRef("");
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
-  });
-  const { data: vaultUsers } = useQuery({
-    queryKey: ["vault_users_active"],
-    queryFn: async () => ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
   const { data: products } = useQuery({
     queryKey: ["products-picker"],
@@ -58,14 +55,16 @@ function EditPurchase() {
     },
   });
 
-  // Purchase-time payments live in supplier_payments; the vault spend is read from
-  // those rows, so changing "Paid By" must move them too.
   const { data: paySplits } = useQuery({
     queryKey: ["purchase-payments", id],
-    queryFn: async () =>
-      ((await (supabase.from("supplier_payments" as any) as any)
-        .select("id,amount,method,vault_user_id")
-        .eq("purchase_id", id)).data ?? []) as any[],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("supplier_payments" as any) as any)
+        .select("id,amount,method,payment_date,note,vault_user_id,vault_users(name)")
+        .eq("purchase_id", id)
+        .order("payment_date", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
   });
 
   useEffect(() => {
@@ -73,14 +72,13 @@ function EditPurchase() {
     setSupplierId(purchase.supplier_id ?? "");
     setDate(purchase.purchase_date);
     setNotes(purchase.notes ?? "");
-    setVaultUserId(purchase.vault_user_id ?? "");
     const loadedLines = (purchase.purchase_items ?? []).map((it: any) => ({
       product_id: it.product_id, name: it.products?.name ?? "", unit: it.products?.unit ?? "",
       quantity: Number(it.quantity), unit_price: Number(it.unit_price),
     }));
     setLines(loadedLines);
     baseline.current = JSON.stringify({ supplierId: purchase.supplier_id ?? "", date: purchase.purchase_date,
-      notes: purchase.notes ?? "", vaultUserId: purchase.vault_user_id ?? "", lines: loadedLines });
+      notes: purchase.notes ?? "", lines: loadedLines });
   }, [purchase]);
 
   const addLine = (p: { id: string; name: string; unit: string }) => {
@@ -89,9 +87,16 @@ function EditPurchase() {
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeLine = (i: number) => setLines(lines.filter((_, idx) => idx !== i));
-  const currentSnapshot = useMemo(() => JSON.stringify({ supplierId, date, notes, vaultUserId, lines }), [supplierId, date, notes, vaultUserId, lines]);
-  const { allowNavigation } = useUnsavedChangesGuard(!!baseline.current && currentSnapshot !== baseline.current);
+  const currentSnapshot = useMemo(() => JSON.stringify({ supplierId, date, notes, lines }), [supplierId, date, notes, lines]);
+  const isDirty = !!baseline.current && currentSnapshot !== baseline.current;
+  const { allowNavigation } = useUnsavedChangesGuard(isDirty);
   const grandTotal = lines.reduce((s, l) => s + l.quantity * l.unit_price, 0);
+  const storedGrandTotal = Number(purchase?.grand_total ?? 0);
+  const alreadyPaid = Number(purchase?.amount_paid ?? 0);
+  const balanceDue = Math.max(0, storedGrandTotal - alreadyPaid);
+  const linkedPaymentTotal = (paySplits ?? []).reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
+  const requiresReconciliation = linkedPaymentTotal > alreadyPaid + 0.01;
+  const hasPaymentHistory = (paySplits ?? []).length > 0;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -100,7 +105,8 @@ function EditPurchase() {
       if (lines.length === 0) throw new Error("Add at least one product.");
       if (lines.some((line) => line.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
       if (lines.some((line) => line.unit_price <= 0)) throw new Error("Unit price must be greater than zero for every item.");
-      if ((paySplits ?? []).length > 0 && !vaultUserId) throw new Error("This purchase has recorded payments. Select the Vault User before updating.");
+      if (hasPaymentHistory && supplierId !== purchase.supplier_id) throw new Error("Supplier cannot be changed after payments have been recorded.");
+      if (grandTotal + 0.001 < alreadyPaid) throw new Error("Grand total cannot be less than the amount already paid.");
       // Reverse & delete existing items (triggers restock)
       const { error: dErr } = await supabase.from("purchase_items").delete().eq("purchase_id", id);
       if (dErr) throw dErr;
@@ -110,7 +116,6 @@ function EditPurchase() {
         purchase_date: date,
         grand_total: grandTotal,
         notes: notes || null,
-        vault_user_id: vaultUserId || null,
       }).eq("id", id);
       if (uErr) throw uErr;
       // Insert new items (triggers restock)
@@ -120,20 +125,6 @@ function EditPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
-      // The purchase update above triggers an atomic database sync for every
-      // linked supplier payment. Re-read the ledger to verify the invariant so
-      // a purchase can never appear saved while its vault ledger is stale.
-      const { data: linked, error: lErr } = await (supabase.from("supplier_payments" as any) as any)
-        .select("id,vault_user_id")
-        .eq("purchase_id", id);
-      if (lErr) throw lErr;
-      const expectedVaultUserId = vaultUserId || null;
-      const stalePayments = (linked ?? []).filter(
-        (payment: any) => payment.vault_user_id !== expectedVaultUserId,
-      );
-      if (stalePayments.length > 0) {
-        throw new Error("Purchase saved, but its supplier payment ledger did not synchronize. Please retry or contact an admin.");
-      }
     },
     onSuccess: () => { qc.invalidateQueries(); toast.success("Purchase updated"); allowNavigation(); navigate({ to: "/purchases" }); },
     onError: (e: Error) => toast.error(e.message),
@@ -175,37 +166,78 @@ function EditPurchase() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Supplier *</Label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
+              <Select value={supplierId} onValueChange={setSupplierId} disabled={hasPaymentHistory}>
                 <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                 <SelectContent>{(suppliers ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
+              {hasPaymentHistory && <p className="text-xs text-muted-foreground">Supplier cannot be changed after payments have been recorded.</p>}
             </div>
             <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-            <div className="space-y-2">
-              <Label>Paid By (Vault User){(paySplits ?? []).length > 0 ? " *" : ""}</Label>
-              <Select value={vaultUserId} onValueChange={setVaultUserId}>
-                <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
-                <SelectContent>{(vaultUsers ?? []).map((v: any) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
             <div className="flex items-center justify-between border-t border-border pt-4 text-lg font-bold">
               <span>Grand Total</span><span>{formatCurrency(grandTotal)}</span>
             </div>
-            <p className="text-xs text-muted-foreground">Payments already recorded stay linked. Balance recalculates automatically.</p>
-            {(paySplits ?? []).length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {(paySplits ?? []).length} payment{(paySplits ?? []).length > 1 ? "s" : ""} totalling{" "}
-                {formatCurrency((paySplits ?? []).reduce((s: number, p: any) => s + Number(p.amount), 0))} recorded for this
-                purchase — all linked supplier payment rows will be reassigned to the selected vault user.
-              </p>
-            )}
             <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update Purchase
             </Button>
           </CardContent>
         </Card>
       </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between"><span>Grand Total</span><strong>{formatCurrency(storedGrandTotal)}</strong></div>
+            <div className="flex justify-between"><span>Already Paid</span><strong>{formatCurrency(alreadyPaid)}</strong></div>
+            <div className="flex justify-between border-t pt-3"><span>Balance Due</span><strong>{formatCurrency(balanceDue)}</strong></div>
+            {requiresReconciliation && (
+              <div className="rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="mb-2 h-5 w-5" />
+                Payment ledger requires reconciliation. Linked payment records exceed the Purchase's recorded paid amount. Do not record another payment until this Purchase is reviewed.
+              </div>
+            )}
+            {balanceDue <= 0 ? (
+              <p className="text-sm text-muted-foreground">Purchase is fully paid.</p>
+            ) : (
+              <Button className="w-full" onClick={() => setPaymentOpen(true)} disabled={isDirty || requiresReconciliation || !supplierId}>
+                Record Additional Payment
+              </Button>
+            )}
+            {isDirty && balanceDue > 0 && <p className="text-xs text-muted-foreground">Save the Purchase changes before recording an additional payment.</p>}
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Paid From Vault</TableHead><TableHead>Note</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {(paySplits ?? []).length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No linked payments.</TableCell></TableRow>
+                ) : (paySplits ?? []).map((payment: any) => (
+                  <TableRow key={payment.id}>
+                    <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                    <TableCell>{formatCurrency(Number(payment.amount))}</TableCell>
+                    <TableCell>{payment.method}</TableCell>
+                    <TableCell>{payment.vault_users?.name ?? "—"}</TableCell>
+                    <TableCell>{payment.note || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+      {purchase?.supplier_id && (
+        <PaySupplierDialog
+          open={paymentOpen}
+          onOpenChange={setPaymentOpen}
+          supplierId={purchase.supplier_id}
+          supplierName={(suppliers ?? []).find((supplier) => supplier.id === purchase.supplier_id)?.name}
+          presetPurchaseId={id}
+          lockTarget
+        />
+      )}
     </div>
   );
 }

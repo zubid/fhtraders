@@ -22,12 +22,16 @@ export function PaySupplierDialog({
   supplierId,
   supplierName,
   presetPurchaseId,
+  lockTarget = false,
+  onSuccess,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   supplierId: string;
   supplierName?: string;
   presetPurchaseId?: string;
+  lockTarget?: boolean;
+  onSuccess?: () => void;
 }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState<number>(0);
@@ -65,6 +69,11 @@ export function PaySupplierDialog({
     () => (purchases ?? []).filter((p: any) => purchaseBalance(p) > 0),
     [purchases],
   );
+  const selectedPurchase = useMemo(
+    () => (purchases ?? []).find((p: any) => p.id === target),
+    [purchases, target],
+  );
+  const maximum = target === "fifo" ? outstanding : selectedPurchase ? purchaseBalance(selectedPurchase) : 0;
 
   useEffect(() => {
     if (open) {
@@ -80,6 +89,7 @@ export function PaySupplierDialog({
   const save = useMutation({
     mutationFn: async () => {
       if (!vaultUserId) throw new Error("Paid From Vault is required");
+      if (amount > maximum + 0.001) throw new Error("Payment amount cannot exceed the selected balance due");
       await paySupplier({
         supplierId,
         amount,
@@ -91,9 +101,16 @@ export function PaySupplierDialog({
       });
     },
     onSuccess: () => {
-      qc.invalidateQueries();
+      void qc.invalidateQueries({ queryKey: ["purchase-edit"] });
+      void qc.invalidateQueries({ queryKey: ["purchase-payments"] });
+      void qc.invalidateQueries({ queryKey: ["purchases"] });
+      void qc.invalidateQueries({ queryKey: ["suppliers"] });
+      void qc.invalidateQueries({ queryKey: ["supplier"] });
+      void qc.invalidateQueries({ queryKey: ["vault_users_active"] });
+      void qc.invalidateQueries({ queryKey: ["vault"] });
       toast.success("Payment recorded");
       onOpenChange(false);
+      onSuccess?.();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -110,7 +127,7 @@ export function PaySupplierDialog({
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Apply to</Label>
-            <Select value={target} onValueChange={setTarget}>
+            <Select value={target} onValueChange={setTarget} disabled={lockTarget}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="fifo">Oldest outstanding (FIFO)</SelectItem>
@@ -122,10 +139,15 @@ export function PaySupplierDialog({
               </SelectContent>
             </Select>
           </div>
+          <p className="text-sm text-muted-foreground">
+            {target === "fifo"
+              ? `Total Supplier Outstanding: ${formatCurrency(outstanding)}`
+              : `Balance Due: ${formatCurrency(maximum)}`}
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Amount</Label>
-              <Input type="number" min="0" step="0.01" value={amount}
+              <Input type="number" min="0" max={maximum} step="0.01" value={amount}
                 onChange={(e) => setAmount(+e.target.value)} />
             </div>
             <div className="space-y-2">
@@ -142,14 +164,14 @@ export function PaySupplierDialog({
           </div>
           <div className="space-y-2">
             <Label>Date</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input type="date" max={new Date().toISOString().slice(0, 10)} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Note</Label>
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
           </div>
           <div className="space-y-2">
-            <Label>Paid From (Vault User)</Label>
+            <Label>Paid From Business Vault</Label>
             <Select value={vaultUserId} onValueChange={setVaultUserId}>
               <SelectTrigger><SelectValue placeholder="Select a Business Cash Vault" /></SelectTrigger>
               <SelectContent>
@@ -157,16 +179,16 @@ export function PaySupplierDialog({
               </SelectContent>
             </Select>
           </div>
-          {outstanding > 0 && (
+          {maximum > 0 && (
             <Button type="button" variant="outline" size="sm"
-              onClick={() => setAmount(Number(outstanding.toFixed(2)))}>
-              Pay full outstanding ({formatCurrency(outstanding)})
+              onClick={() => setAmount(Number(maximum.toFixed(2)))}>
+              Pay full {target === "fifo" ? "outstanding" : "balance"} ({formatCurrency(maximum)})
             </Button>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0 || !vaultUserId}>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || amount <= 0 || amount > maximum + 0.001 || !vaultUserId}>
             {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Record Payment
           </Button>
         </DialogFooter>
