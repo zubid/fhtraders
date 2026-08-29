@@ -1,10 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Phone,
@@ -13,8 +9,6 @@ import {
   HandCoins,
   Download,
   User,
-  Pencil,
-  Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -30,7 +24,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/suppliers_/$id")({
   component: SupplierProfile,
@@ -40,9 +33,6 @@ const PAGE_SIZE = 10;
 
 function SupplierProfile() {
   const { id } = Route.useParams();
-  const qc = useQueryClient();
-  
-  const [editingPayment, setEditingPayment] = useState<any>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
@@ -84,27 +74,6 @@ function SupplierProfile() {
   },
 });
 
-
-// ADD THIS HERE
-const deletePayment = useMutation({
-  mutationFn: async (paymentId: string) => {
-    const { error } = await (supabase
-      .from("supplier_payments" as any) as any)
-      .delete()
-      .eq("id", paymentId);
-
-    if (error) throw error;
-  },
-
-  onSuccess: () => {
-    toast.success("Payment removed and vault balance returned");
-    qc.invalidateQueries();
-  },
-
-  onError: (e: Error) => {
-    toast.error(e.message);
-  },
-});
 
   const lifetime = (purchases ?? []).reduce((s, x: any) => s + Number(x.grand_total), 0);
   const paid = (purchases ?? []).reduce((s, x: any) => s + Number(x.amount_paid), 0);
@@ -263,7 +232,6 @@ const deletePayment = useMutation({
                     <TableHeader><TableRow>
                       <TableHead>Date</TableHead><TableHead>Purchase</TableHead><TableHead>Method</TableHead>
                       <TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Balance After</TableHead><TableHead>Note</TableHead>
-<TableHead className="text-right">Actions</TableHead>
                     </TableRow></TableHeader>
                     <TableBody>
                       {ledger.map((p: any) => (
@@ -275,24 +243,6 @@ const deletePayment = useMutation({
                           <TableCell className="text-right">{formatCurrency(p.running)}</TableCell>
                           <TableCell className="text-muted-foreground">
                             {p.note ?? "-"}
-                          </TableCell>
-                          
-                          <TableCell className="text-right space-x-2">
-                            {/* <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEditingPayment(p)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button> */}
-                          
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => deletePayment.mutate(p.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}

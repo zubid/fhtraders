@@ -843,6 +843,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      record_supplier_payment: {
+        Args: {
+          p_amount: number
+          p_method: string
+          p_note?: string | null
+          p_payment_date: string
+          p_preferred_purchase_id?: string | null
+          p_supplier_id: string
+          p_vault_user_id?: string | null
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

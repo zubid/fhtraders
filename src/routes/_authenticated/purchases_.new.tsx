@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PAYMENT_METHODS, METHOD_LABELS } from "@/lib/supplier-credit";
+import { paySupplier, PAYMENT_METHODS, METHOD_LABELS } from "@/lib/supplier-credit";
 import { ProductSearchPicker } from "@/components/app/ProductSearchPicker";
 
 export const Route = createFileRoute("/_authenticated/purchases_/new")({
@@ -90,7 +90,7 @@ function NewPurchase() {
         .from("purchases")
         .insert({
           supplier_id: sid, purchase_date: date, grand_total: grandTotal, notes: notes || null,
-          amount_paid: paidNow, vault_user_id: activeSplits.find((s) => s.vault_user_id)?.vault_user_id || null,
+          amount_paid: 0, vault_user_id: null,
         } as any)
         .select("id").single();
       if (pErr) throw pErr;
@@ -100,28 +100,34 @@ function NewPurchase() {
       }));
       const { error: iErr } = await supabase.from("purchase_items").insert(items);
       if (iErr) throw iErr;
-      if (activeSplits.length > 0 && sid) {
-        const { data: userData } = await supabase.auth.getUser();
-        const { error: spErr } = await (supabase.from("supplier_payments" as any) as any).insert(
-          activeSplits.map((s) => ({
-            supplier_id: sid,
-            purchase_id: purchase.id,
-            amount: Number(s.amount),
-            method: s.method,
-            payment_date: date,
+      for (const split of activeSplits) {
+        try {
+          await paySupplier({
+            supplierId: sid!,
+            purchaseId: purchase.id,
+            amount: Number(split.amount),
+            method: split.method,
+            date,
             note: "Paid at purchase",
-            vault_user_id: s.vault_user_id || null,
-            created_by: userData.user?.id ?? null,
-          })),
-        );
-        if (spErr) throw spErr;
+            vaultUserId: split.vault_user_id,
+          });
+        } catch {
+          return { purchaseId: purchase.id, initialPaymentFailed: true };
+        }
       }
+      return { purchaseId: purchase.id, initialPaymentFailed: false };
     },
-    onSuccess: () => {
+    onSuccess: ({ purchaseId, initialPaymentFailed }) => {
       qc.invalidateQueries();
-      toast.success("Purchase saved · stock updated");
       allowNavigation();
-      navigate({ to: "/purchases" });
+      if (initialPaymentFailed) {
+        sessionStorage.setItem(`purchase-initial-payment-warning:${purchaseId}`, "true");
+        toast.warning("Purchase saved, but an initial payment could not be recorded");
+        navigate({ to: "/purchases/edit/$id", params: { id: purchaseId } });
+      } else {
+        toast.success("Purchase saved · stock updated");
+        navigate({ to: "/purchases" });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
