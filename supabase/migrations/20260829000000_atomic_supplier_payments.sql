@@ -6,7 +6,10 @@ CREATE OR REPLACE FUNCTION public.prevent_paid_purchase_supplier_change()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN
   IF NEW.supplier_id IS DISTINCT FROM OLD.supplier_id
-     AND EXISTS (SELECT 1 FROM public.supplier_payments WHERE purchase_id = OLD.id) THEN
+     AND (
+       COALESCE(OLD.amount_paid, 0) > 0
+       OR EXISTS (SELECT 1 FROM public.supplier_payments WHERE purchase_id = OLD.id)
+     ) THEN
     RAISE EXCEPTION 'Supplier cannot be changed after payments have been recorded.';
   END IF;
   RETURN NEW;
@@ -16,6 +19,24 @@ DROP TRIGGER IF EXISTS prevent_paid_purchase_supplier_change ON public.purchases
 CREATE TRIGGER prevent_paid_purchase_supplier_change
 BEFORE UPDATE OF supplier_id ON public.purchases
 FOR EACH ROW EXECUTE FUNCTION public.prevent_paid_purchase_supplier_change();
+
+CREATE OR REPLACE FUNCTION public.prevent_purchase_grand_total_regression()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  IF COALESCE(OLD.amount_paid, 0) <= COALESCE(OLD.grand_total, 0) + 0.01 THEN
+    IF COALESCE(NEW.grand_total, 0) < COALESCE(NEW.amount_paid, 0) - 0.01 THEN
+      RAISE EXCEPTION 'Grand Total cannot be lower than the amount already paid.';
+    END IF;
+  ELSIF COALESCE(NEW.grand_total, 0) < COALESCE(OLD.grand_total, 0) - 0.01 THEN
+    RAISE EXCEPTION 'Grand Total cannot be lower than its current value while this Purchase requires reconciliation.';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS prevent_purchase_grand_total_regression ON public.purchases;
+CREATE TRIGGER prevent_purchase_grand_total_regression
+BEFORE UPDATE OF grand_total ON public.purchases
+FOR EACH ROW EXECUTE FUNCTION public.prevent_purchase_grand_total_regression();
 
 CREATE OR REPLACE FUNCTION public.record_supplier_payment(
   p_supplier_id uuid,

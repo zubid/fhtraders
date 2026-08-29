@@ -106,7 +106,7 @@ function EditPurchase() {
   const linkedPaymentTotal = (paySplits ?? []).reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
   const requiresReconciliation = linkedPaymentTotal > alreadyPaid + 0.01;
   const historicallyOverpaid = alreadyPaid > storedGrandTotal + 0.01;
-  const hasPaymentHistory = (paySplits ?? []).length > 0;
+  const hasRecordedPayments = alreadyPaid > 0 || (paySplits ?? []).length > 0;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -115,7 +115,7 @@ function EditPurchase() {
       if (lines.length === 0) throw new Error("Add at least one product.");
       if (lines.some((line) => line.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
       if (lines.some((line) => line.unit_price <= 0)) throw new Error("Unit price must be greater than zero for every item.");
-      if (hasPaymentHistory && supplierId !== purchase.supplier_id) throw new Error("Supplier cannot be changed after payments have been recorded.");
+      if (hasRecordedPayments && supplierId !== purchase.supplier_id) throw new Error("Supplier cannot be changed after payments have been recorded.");
       if (historicallyOverpaid && grandTotal + 0.001 < storedGrandTotal) {
         throw new Error("Grand Total cannot be lower than its current value while this Purchase requires reconciliation.");
       }
@@ -181,11 +181,11 @@ function EditPurchase() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Supplier *</Label>
-              <Select value={supplierId} onValueChange={setSupplierId} disabled={hasPaymentHistory}>
+              <Select value={supplierId} onValueChange={setSupplierId} disabled={hasRecordedPayments}>
                 <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
                 <SelectContent>{(suppliers ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
-              {hasPaymentHistory && <p className="text-xs text-muted-foreground">Supplier cannot be changed after payments have been recorded.</p>}
+              {hasRecordedPayments && <p className="text-xs text-muted-foreground">Supplier cannot be changed after payments have been recorded.</p>}
             </div>
             <div className="space-y-2"><Label>Purchase Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Notes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
