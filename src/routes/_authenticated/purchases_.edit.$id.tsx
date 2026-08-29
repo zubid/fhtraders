@@ -16,6 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProductSearchPicker } from "@/components/app/ProductSearchPicker";
 import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
+import { useAuth } from "@/hooks/useAuth";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/purchases_/edit/$id")({
   component: EditPurchase,
@@ -27,10 +30,14 @@ function EditPurchase() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { isAdmin } = useAuth();
   const [supplierId, setSupplierId] = useState("");
   const [date, setDate] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [correctionPayment, setCorrectionPayment] = useState<any | null>(null);
+  const [newVaultId, setNewVaultId] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
   const [initialPaymentWarning, setInitialPaymentWarning] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const baseline = useRef("");
@@ -60,12 +67,48 @@ function EditPurchase() {
     queryKey: ["purchase-payments", id],
     queryFn: async () => {
       const { data, error } = await (supabase.from("supplier_payments" as any) as any)
-        .select("id,amount,method,payment_date,note,vault_user_id,vault_users(name)")
+        .select("id,amount,method,payment_date,note,vault_user_id,vault_users(name),supplier_payment_vault_corrections(old_vault:vault_users!old_vault_user_id(name),new_vault:vault_users!new_vault_user_id(name),reason,corrected_at)")
         .eq("purchase_id", id)
         .order("payment_date", { ascending: false });
       if (error) throw error;
       return (data ?? []) as any[];
     },
+  });
+
+  const { data: correctionVaults } = useQuery({
+    queryKey: ["vault-users", "business-cash", "active"],
+    enabled: isAdmin,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("vault_users") as any)
+        .select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name");
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; name: string }>;
+    },
+  });
+
+  const correctVault = useMutation({
+    mutationFn: async () => {
+      if (!correctionPayment || !newVaultId || !correctionReason.trim()) throw new Error("New Vault and reason are required.");
+      const { error } = await (supabase.rpc as any)("correct_supplier_payment_vault", {
+        p_supplier_payment_id: correctionPayment.id,
+        p_new_vault_user_id: newVaultId,
+        p_reason: correctionReason.trim(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setCorrectionPayment(null); setNewVaultId(""); setCorrectionReason("");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["purchase-payments", id] }),
+        qc.invalidateQueries({ queryKey: ["purchase-edit", id] }),
+        qc.invalidateQueries({ queryKey: ["vault"] }),
+        qc.invalidateQueries({ queryKey: ["vault-users"] }),
+        qc.invalidateQueries({ queryKey: ["suppliers"] }),
+        qc.invalidateQueries({ queryKey: ["supplier"] }),
+      ]);
+      toast.success("Payment Vault corrected");
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   useEffect(() => {
@@ -237,17 +280,24 @@ function EditPurchase() {
           <CardHeader><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Paid From Vault</TableHead><TableHead>Note</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Paid From Vault</TableHead><TableHead>Note</TableHead>{isAdmin && <TableHead className="text-right">Action</TableHead>}</TableRow></TableHeader>
               <TableBody>
                 {(paySplits ?? []).length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No linked payments.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 6 : 5} className="text-center text-muted-foreground">No linked payments.</TableCell></TableRow>
                 ) : (paySplits ?? []).map((payment: any) => (
                   <TableRow key={payment.id}>
                     <TableCell>{formatDate(payment.payment_date)}</TableCell>
                     <TableCell>{formatCurrency(Number(payment.amount))}</TableCell>
                     <TableCell>{payment.method}</TableCell>
-                    <TableCell>{payment.vault_users?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      <div>{payment.vault_users?.name ?? "—"}</div>
+                      {payment.supplier_payment_vault_corrections?.length > 0 && (() => {
+                        const latest = [...payment.supplier_payment_vault_corrections].sort((a: any, b: any) => b.corrected_at.localeCompare(a.corrected_at))[0];
+                        return <div className="mt-1 text-xs text-muted-foreground">Corrected from {latest.old_vault?.name ?? "previous Vault"} to {latest.new_vault?.name ?? "current Vault"}</div>;
+                      })()}
+                    </TableCell>
                     <TableCell>{payment.note || "—"}</TableCell>
+                    {isAdmin && <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setCorrectionPayment(payment); setNewVaultId(""); setCorrectionReason(""); }}>Correct Vault</Button></TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -265,6 +315,35 @@ function EditPurchase() {
           lockTarget
         />
       )}
+      <Dialog open={!!correctionPayment} onOpenChange={(open) => { if (!open && !correctVault.isPending) setCorrectionPayment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Correct Payment Vault</DialogTitle>
+            <DialogDescription>This changes attribution only and creates a permanent audit record. Confirm the payment details carefully.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 rounded-md border p-3 text-sm">
+              <span className="text-muted-foreground">Purchase reference</span><strong>{purchase?.reference_no ?? "—"}</strong>
+              <span className="text-muted-foreground">Payment amount</span><strong>{formatCurrency(Number(correctionPayment?.amount ?? 0))}</strong>
+              <span className="text-muted-foreground">Current Vault</span><strong>{correctionPayment?.vault_users?.name ?? "—"}</strong>
+            </div>
+            <div className="space-y-2">
+              <Label>New Vault *</Label>
+              <Select value={newVaultId} onValueChange={setNewVaultId}>
+                <SelectTrigger><SelectValue placeholder="Select active Business Cash Vault" /></SelectTrigger>
+                <SelectContent>{(correctionVaults ?? []).filter((vault) => vault.id !== correctionPayment?.vault_user_id).map((vault) => <SelectItem key={vault.id} value={vault.id}>{vault.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Reason *</Label><Textarea value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} placeholder="Explain why this historical attribution is being corrected" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCorrectionPayment(null)} disabled={correctVault.isPending}>Cancel</Button>
+            <Button onClick={() => correctVault.mutate()} disabled={!newVaultId || !correctionReason.trim() || correctVault.isPending}>
+              {correctVault.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm Vault Correction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
