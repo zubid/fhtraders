@@ -189,9 +189,11 @@ function PaymentsPage() {
                       <TableRow key={p.id}>
                         <TableCell>{formatDate(p.payment_date)}</TableCell>
                         <TableCell>
+                          {p.restaurant_id ? (
                           <Link to="/restaurants/$id" params={{ id: p.restaurant_id }} className="inline-flex items-center gap-1 hover:text-primary hover:underline">
                             {p.restaurants?.name ?? "-"}<ExternalLink className="h-3 w-3" />
                           </Link>
+                          ) : <span className="text-muted-foreground">POS / Walk-in</span>}
                         </TableCell>
                         <TableCell className="font-mono text-xs">{p.sales?.invoice_no ?? "General (FIFO)"}</TableCell>
                         <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>

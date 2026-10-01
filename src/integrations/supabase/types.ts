@@ -228,7 +228,7 @@ export type Database = {
           method: string
           note: string | null
           payment_date: string
-          restaurant_id: string
+          restaurant_id: string | null
           sale_id: string | null
           updated_at: string
           vault_user_id: string | null
@@ -241,7 +241,7 @@ export type Database = {
           method?: string
           note?: string | null
           payment_date?: string
-          restaurant_id: string
+          restaurant_id?: string | null
           sale_id?: string | null
           updated_at?: string
           vault_user_id?: string | null
@@ -254,7 +254,7 @@ export type Database = {
           method?: string
           note?: string | null
           payment_date?: string
-          restaurant_id?: string
+          restaurant_id?: string | null
           sale_id?: string | null
           updated_at?: string
           vault_user_id?: string | null
@@ -554,14 +554,17 @@ export type Database = {
           amount_received: number
           created_at: string
           created_by: string | null
+          customer_name: string | null
           discount: number
           grand_total: number
           id: string
           invoice_no: string
           notes: string | null
+          payment_method: string | null
           payment_status: string
           restaurant_id: string | null
           sale_date: string
+          source: string
           subtotal: number
           tax: number
           total_cost: number
@@ -570,14 +573,17 @@ export type Database = {
           amount_received?: number
           created_at?: string
           created_by?: string | null
+          customer_name?: string | null
           discount?: number
           grand_total?: number
           id?: string
           invoice_no?: string
           notes?: string | null
+          payment_method?: string | null
           payment_status?: string
           restaurant_id?: string | null
           sale_date?: string
+          source?: string
           subtotal?: number
           tax?: number
           total_cost?: number
@@ -586,14 +592,17 @@ export type Database = {
           amount_received?: number
           created_at?: string
           created_by?: string | null
+          customer_name?: string | null
           discount?: number
           grand_total?: number
           id?: string
           invoice_no?: string
           notes?: string | null
+          payment_method?: string | null
           payment_status?: string
           restaurant_id?: string | null
           sale_date?: string
+          source?: string
           subtotal?: number
           tax?: number
           total_cost?: number
@@ -979,12 +988,30 @@ export type Database = {
         }
         Returns: string
       }
+      create_pos_sale: {
+        Args: {
+          p_customer_name: string
+          p_discount: number
+          p_items: Json
+          p_method: string
+          p_note: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      list_business_cash_vaults: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+        }[]
       }
       record_supplier_payment: {
         Args: {

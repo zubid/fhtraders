@@ -36,7 +36,7 @@ type Product = {
 };
 
 const emptyForm = {
-  name: "", category_id: "", unit: "pcs", reorder_level: 0, max_stock_level: 0,
+  name: "", category_id: "", unit: "pcs", reorder_level: 0, max_stock_level: 0, default_selling_price: 0,
 };
 
 function ProductsPage() {
@@ -115,7 +115,9 @@ function ProductsPage() {
         unit: form.unit,
         reorder_level: Number(form.reorder_level),
         max_stock_level: Number(form.max_stock_level),
+        default_selling_price: Number(form.default_selling_price) || 0,
       };
+      if (payload.default_selling_price < 0) throw new Error("Selling price cannot be negative");
       if (editing) {
         const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
         if (error) throw error;
@@ -155,6 +157,7 @@ function ProductsPage() {
     setForm({
       name: p.name, category_id: p.category_id ?? "", unit: p.unit,
       reorder_level: p.reorder_level, max_stock_level: p.max_stock_level,
+      default_selling_price: Number(p.default_selling_price) || 0,
     });
     setOpen(true);
   };
@@ -229,6 +232,7 @@ function ProductsPage() {
                   <TableHead>Product</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Selling Price</TableHead>
                   <TableHead className="text-right">Stock</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -240,6 +244,7 @@ function ProductsPage() {
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{p.sku}</TableCell>
                     <TableCell>{p.categories?.name ?? "-"}</TableCell>
+                    <TableCell className="text-right">{Number(p.default_selling_price) > 0 ? formatCurrency(p.default_selling_price) : <span className="text-muted-foreground">—</span>}</TableCell>
                     <TableCell className="text-right">{formatNumber(p.current_stock)} {p.unit}</TableCell>
                     <TableCell><StockBadge current={p.current_stock} reorder={p.reorder_level} max={p.max_stock_level} /></TableCell>
                     <TableCell className="text-right">
@@ -297,6 +302,11 @@ function ProductsPage() {
                 <Input className="mt-2" placeholder="Type a custom unit (e.g. bottle, bag)"
                   value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
               )}
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Selling Price / POS Price</Label>
+              <Input type="number" min={0} value={form.default_selling_price} onChange={(e) => setForm({ ...form, default_selling_price: Math.max(0, +e.target.value) })} />
+              <p className="text-xs text-muted-foreground">Default price loaded in POS. Can be changed per sale.</p>
             </div>
             <div className="space-y-2">
               <Label>Reorder Level (low)</Label>
