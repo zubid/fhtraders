@@ -43,7 +43,7 @@ function PurchasesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, suppliers(name), vault_users(name), purchase_items(id, quantity, unit_price, line_total, products(name, unit))")
+        .select("*, suppliers(name), vault_users(name), purchase_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
         .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data;
