@@ -16,6 +16,7 @@ import {
   Settings,
   Truck,
   Vault,
+  MonitorSmartphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,7 @@ import { useSettings } from "@/hooks/useSettings";
 const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: true },
   { title: "Purchases", url: "/purchases", icon: ShoppingCart },
+  { title: "POS", url: "/pos", icon: MonitorSmartphone },
   { title: "Sales", url: "/sales", icon: Receipt },
   { title: "Payments", url: "/payments", icon: HandCoins, adminOnly: true },
   { title: "Expenses", url: "/expenses", icon: Wallet, adminOnly: true },

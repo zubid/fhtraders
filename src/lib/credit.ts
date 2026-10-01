@@ -76,7 +76,8 @@ export function distributePayment(
  * including when a payment is deleted after it had already been split across
  * multiple invoices via FIFO.
  */
-export async function recomputeRestaurantBalances(restaurantId: string) {
+export async function recomputeRestaurantBalances(restaurantId: string | null) {
+  if (!restaurantId) return; // POS (walk-in) payments are not tied to a restaurant
   const { data: sales, error: sErr } = await supabase
     .from("sales")
     .select("id, grand_total, amount_received, sale_date, invoice_no")
@@ -162,7 +163,7 @@ export async function recordPayment(opts: {
 }
 
 /** Delete a payment from the ledger, then recompute balances for the restaurant. */
-export async function deletePayment(paymentId: string, restaurantId: string) {
+export async function deletePayment(paymentId: string, restaurantId: string | null) {
   const { error } = await supabase.from("payments").delete().eq("id", paymentId);
   if (error) throw error;
   await recomputeRestaurantBalances(restaurantId);
@@ -171,7 +172,7 @@ export async function deletePayment(paymentId: string, restaurantId: string) {
 /** Edit an existing payment (amount / date / method / note / target invoice), then recompute. */
 export async function updatePayment(
   paymentId: string,
-  restaurantId: string,
+  restaurantId: string | null,
   fields: {
     amount?: number;
     method?: string;

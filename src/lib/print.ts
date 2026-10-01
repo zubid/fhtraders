@@ -302,3 +302,25 @@ export function printCatalog(
   w.focus();
   setTimeout(() => w.print(), 400);
 }
+
+export function printPosReceipt(sale: any) {
+  const items = (sale.sale_items ?? [])
+    .map((it: any) => `<tr><td>${esc(it.products?.name ?? "")}</td><td class="r">${it.quantity}</td><td class="r">${formatCurrency(it.unit_price)}</td><td class="r">${formatCurrency(it.line_total)}</td></tr>`)
+    .join("");
+  const dt = new Date(sale.created_at ?? Date.now()).toLocaleString();
+  const inner = `
+    ${brandHeader("RECEIPT", sale.invoice_no, dt)}
+    <div class="meta">
+      <div class="box"><div class="label">Customer</div><strong>${esc(sale.customer_name || "Walk-in Customer")}</strong></div>
+      <div class="box r"><div class="label">Cashier</div>${esc(sale.cashier ?? "-")}</div>
+    </div>
+    <table><thead><tr><th>Product</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${items}</tbody></table>
+    <div class="totals">
+      <div><span>Subtotal</span><span>${formatCurrency(sale.subtotal)}</span></div>
+      ${Number(sale.discount) ? `<div><span>Discount</span><span>-${formatCurrency(sale.discount)}</span></div>` : ""}
+      <div class="grand"><span>Total</span><span>${formatCurrency(sale.grand_total)}</span></div>
+      <div><span>Payment</span><span>${esc((sale.payment_method ?? "").toUpperCase())}</span></div>
+      <div><span>Amount Received</span><span>${formatCurrency(sale.amount_received)}</span></div>
+    </div>`;
+  render(sale.invoice_no ?? "Receipt", inner);
+}
