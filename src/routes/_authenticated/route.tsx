@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
 });
 
-const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault"];
+const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault", "/activity"];
 
 function AuthenticatedLayout() {
   const { session, loading, role, isAdmin } = useAuth();
