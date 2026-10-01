@@ -49,7 +49,7 @@ function SalesPage() {
   });
 
   const filtered = useMemo(() => {
-    let rows = data ?? [];
+    let rows = (data ?? []).filter((r:any) => !r.is_voided);
     if (from) rows = rows.filter((r) => r.sale_date >= from);
     if (to) rows = rows.filter((r) => r.sale_date <= to);
     if (status !== "all") rows = rows.filter((r) => r.payment_status === status);
@@ -58,13 +58,13 @@ function SalesPage() {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sales").delete().eq("id", id);
+      const { error } = await (supabase.rpc as any)("archive_sale", { p_sale_id: id, p_reason: "Archived from Sales screen" });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries();
       setToDelete(null);
-      toast.success("Sale deleted and stock restored");
+      toast.success("Sale archived. Audit history preserved.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -120,7 +120,7 @@ function SalesPage() {
                       <TableCell className="text-right font-medium">{formatCurrency(s.grand_total)}</TableCell>
                       <TableCell className="text-right text-success">{formatCurrency(s.amount_received)}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(bal)}</TableCell>
-                      <TableCell><PaymentStatusBadge status={s.payment_status} /></TableCell>
+                      <TableCell>{Number(s.grand_total) === 0 ? <span className="text-xs font-medium text-muted-foreground">Returned / Closed</span> : <PaymentStatusBadge status={s.payment_status} />}</TableCell>
                       <TableCell className="text-right">
                         {bal > 0 && s.restaurant_id && (
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
@@ -193,7 +193,7 @@ function SalesPage() {
         open={!!toDelete}
         onOpenChange={(v) => !v && setToDelete(null)}
         title="Delete sale?"
-        description="This restores the stock that was deducted by this sale."
+        description="This archives the invoice instead of physically deleting it. Any return/audit history is preserved, and only stock still outstanding on the invoice is restored."
         onConfirm={() => toDelete && del.mutate(toDelete.id)}
       />
     </div>
