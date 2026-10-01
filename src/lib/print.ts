@@ -304,23 +304,85 @@ export function printCatalog(
 }
 
 export function printPosReceipt(sale: any) {
+  const b = getBranding();
+  const money = (value: any) => {
+    const n = Number(value ?? 0);
+    return `PKR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
   const items = (sale.sale_items ?? [])
-    .map((it: any) => `<tr><td>${esc(it.products?.name ?? "")}</td><td class="r">${it.quantity}</td><td class="r">${formatCurrency(it.unit_price)}</td><td class="r">${formatCurrency(it.line_total)}</td></tr>`)
+    .map((it: any) => `
+      <div class="item">
+        <div class="item-name">${esc(it.products?.name ?? "")}</div>
+        <div class="item-line">
+          <span>${esc(it.quantity)} ${esc(it.products?.unit ?? "")} × ${money(it.unit_price)}</span>
+          <strong>${money(it.line_total ?? Number(it.quantity) * Number(it.unit_price))}</strong>
+        </div>
+      </div>`)
     .join("");
   const dt = new Date(sale.created_at ?? Date.now()).toLocaleString();
-  const inner = `
-    ${brandHeader("RECEIPT", sale.invoice_no, dt)}
-    <div class="meta">
-      <div class="box"><div class="label">Customer</div><strong>${esc(sale.customer_name || "Walk-in Customer")}</strong></div>
-      <div class="box r"><div class="label">Cashier</div>${esc(sale.cashier ?? "-")}</div>
+  const customer = sale.customer_name ? `<div><span>Customer</span><strong>${esc(sale.customer_name)}</strong></div>` : "";
+  const discount = Number(sale.discount ?? 0);
+  const received = Number(sale.amount_received ?? sale.grand_total ?? 0);
+  const tendered = Number(sale.tendered ?? received);
+  const change = Math.max(0, tendered - Number(sale.grand_total ?? 0));
+  const contact = [b.address, b.phone].filter(Boolean).map(esc).join("<br/>");
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${esc(sale.invoice_no ?? "POS Receipt")}</title>
+  <style>
+    @page{size:80mm auto;margin:2.5mm}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;width:75mm;background:#fff;color:#000}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.3}
+    .receipt{width:100%}
+    .center{text-align:center}
+    .business{font-size:17px;font-weight:800;line-height:1.1;margin:0}
+    .tag{font-size:10px;margin-top:2px}
+    .contact{font-size:9px;margin-top:3px}
+    .rule{border-top:1px dashed #000;margin:6px 0}
+    .meta>div,.total-row{display:flex;justify-content:space-between;gap:8px;margin:2px 0}
+    .meta strong{font-weight:700;text-align:right}
+    .item{padding:3px 0}
+    .item-name{font-weight:700;font-size:11px}
+    .item-line{display:flex;justify-content:space-between;gap:6px;font-size:10px}
+    .item-line strong{white-space:nowrap}
+    .total-row.grand{font-size:14px;font-weight:800;margin:4px 0}
+    .payment{font-size:10px}
+    .footer{text-align:center;font-size:9px;margin-top:7px}
+    .thanks{text-align:center;font-size:11px;font-weight:700;margin-top:7px}
+    @media print{html,body{width:75mm}.no-print{display:none}}
+  </style></head><body><div class="receipt">
+    <div class="center">
+      <div class="business">${esc(b.business_name || "FH Traders")}</div>
+      ${b.business_tagline ? `<div class="tag">${esc(b.business_tagline)}</div>` : ""}
+      ${contact ? `<div class="contact">${contact}</div>` : ""}
     </div>
-    <table><thead><tr><th>Product</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>${items}</tbody></table>
-    <div class="totals">
-      <div><span>Subtotal</span><span>${formatCurrency(sale.subtotal)}</span></div>
-      ${Number(sale.discount) ? `<div><span>Discount</span><span>-${formatCurrency(sale.discount)}</span></div>` : ""}
-      <div class="grand"><span>Total</span><span>${formatCurrency(sale.grand_total)}</span></div>
-      <div><span>Payment</span><span>${esc((sale.payment_method ?? "").toUpperCase())}</span></div>
-      <div><span>Amount Received</span><span>${formatCurrency(sale.amount_received)}</span></div>
-    </div>`;
-  render(sale.invoice_no ?? "Receipt", inner);
+    <div class="rule"></div>
+    <div class="meta">
+      <div><span>Invoice</span><strong>${esc(sale.invoice_no ?? "-")}</strong></div>
+      <div><span>Date</span><strong>${esc(dt)}</strong></div>
+      <div><span>Cashier</span><strong>${esc(sale.cashier ?? "-")}</strong></div>
+      ${customer}
+    </div>
+    <div class="rule"></div>
+    ${items || '<div class="center">No items</div>'}
+    <div class="rule"></div>
+    <div class="total-row"><span>Subtotal</span><strong>${money(sale.subtotal)}</strong></div>
+    ${discount ? `<div class="total-row"><span>Discount</span><strong>-${money(discount)}</strong></div>` : ""}
+    <div class="total-row grand"><span>TOTAL</span><span>${money(sale.grand_total)}</span></div>
+    <div class="rule"></div>
+    <div class="payment">
+      <div class="total-row"><span>Payment</span><strong>${esc((sale.payment_method ?? "cash").toUpperCase())}</strong></div>
+      <div class="total-row"><span>Paid</span><strong>${money(received)}</strong></div>
+      ${tendered > received ? `<div class="total-row"><span>Tendered</span><strong>${money(tendered)}</strong></div>` : ""}
+      ${change > 0 ? `<div class="total-row"><span>Change</span><strong>${money(change)}</strong></div>` : ""}
+    </div>
+    <div class="rule"></div>
+    <div class="thanks">Thank You</div>
+    ${b.invoice_footer ? `<div class="footer">${esc(b.invoice_footer)}</div>` : ""}
+  </div></body></html>`;
+  const w = window.open("", "_blank", "width=420,height=800");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 250);
 }
