@@ -162,16 +162,19 @@ function LedgerDialog({ product, onClose }: { product: any; onClose: () => void 
       (await supabase.from("stock_movements").select("*").eq("product_id", product.id).order("created_at", { ascending: false }).limit(200)).data ?? [],
   });
 
+  const refs=(movements??[]).filter((m:any)=>m.reference_id).map((m:any)=>m.reference_id);
+  const {data: purchaseLines}=useQuery({queryKey:["ledger-purchase-prices",product?.id,refs.join(",")],enabled:!!product&&refs.length>0,queryFn:async()=>((await supabase.from("purchase_items").select("purchase_id,unit_price,line_total,purchases(reference_no,purchase_date,suppliers(name))").eq("product_id",product.id).in("purchase_id",refs)).data??[]) as any[]});
+  const purchaseMap=new Map((purchaseLines??[]).map((x:any)=>[x.purchase_id,x]));
   return (
     <Dialog open={!!product} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-5xl">
         <DialogHeader><DialogTitle>Stock Ledger · {product?.name}</DialogTitle></DialogHeader>
         {isLoading ? <Skeleton className="h-40 w-full" /> : (movements ?? []).length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">No movements yet.</p>
         ) : (
           <div className="max-h-96 overflow-y-auto">
             <Table>
-              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference / Supplier</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Unit Price</TableHead><TableHead className="text-right">Value</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
               <TableBody>
                 {(movements ?? []).map((m: any) => (
                   <TableRow key={m.id}>
@@ -181,9 +184,12 @@ function LedgerDialog({ product, onClose }: { product: any; onClose: () => void 
                         {m.reference_type}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-xs">{purchaseMap.get(m.reference_id)?.purchases?.reference_no??m.reference_type}<div className="text-muted-foreground">{purchaseMap.get(m.reference_id)?.purchases?.suppliers?.name??""}</div></TableCell>
                     <TableCell className={`text-right ${m.movement_type === "in" ? "text-success" : "text-destructive"}`}>
                       {m.movement_type === "in" ? "+" : "-"}{formatNumber(m.quantity)}
                     </TableCell>
+                    <TableCell className="text-right">{purchaseMap.has(m.reference_id)?formatCurrency(purchaseMap.get(m.reference_id)?.unit_price):"—"}</TableCell>
+                    <TableCell className="text-right">{purchaseMap.has(m.reference_id)?formatCurrency(Number(m.quantity)*Number(purchaseMap.get(m.reference_id)?.unit_price??0)):"—"}</TableCell>
                     <TableCell className="text-right font-medium">{formatNumber(m.balance_after)}</TableCell>
                   </TableRow>
                 ))}
