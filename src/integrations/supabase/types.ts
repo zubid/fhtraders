@@ -649,6 +649,68 @@ export type Database = {
           },
         ]
       }
+      supplier_payment_vault_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by: string | null
+          id: string
+          new_vault_user_id: string
+          old_vault_user_id: string
+          purchase_id: string | null
+          reason: string
+          supplier_payment_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_vault_user_id: string
+          old_vault_user_id: string
+          purchase_id?: string | null
+          reason: string
+          supplier_payment_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_vault_user_id?: string
+          old_vault_user_id?: string
+          purchase_id?: string | null
+          reason?: string
+          supplier_payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payment_vault_corrections_new_vault_user_id_fkey"
+            columns: ["new_vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_vault_corrections_old_vault_user_id_fkey"
+            columns: ["old_vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_vault_corrections_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_payment_vault_corrections_supplier_payment_id_fkey"
+            columns: ["supplier_payment_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_payments: {
         Row: {
           amount: number
@@ -764,6 +826,69 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_cash_movements: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          destination_vault_user_id: string
+          id: string
+          movement_date: string
+          movement_type: string
+          note: string | null
+          source_vault_user_id: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          destination_vault_user_id: string
+          id?: string
+          movement_date?: string
+          movement_type: string
+          note?: string | null
+          source_vault_user_id: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          destination_vault_user_id?: string
+          id?: string
+          movement_date?: string
+          movement_type?: string
+          note?: string | null
+          source_vault_user_id?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_cash_movements_destination_vault_user_id_fkey"
+            columns: ["destination_vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_cash_movements_source_vault_user_id_fkey"
+            columns: ["source_vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vault_topups: {
         Row: {
           amount: number
@@ -815,6 +940,7 @@ export type Database = {
           opening_balance: number
           phone: string | null
           updated_at: string
+          vault_type: string
         }
         Insert: {
           created_at?: string
@@ -825,6 +951,7 @@ export type Database = {
           opening_balance?: number
           phone?: string | null
           updated_at?: string
+          vault_type?: string
         }
         Update: {
           created_at?: string
@@ -835,6 +962,7 @@ export type Database = {
           opening_balance?: number
           phone?: string | null
           updated_at?: string
+          vault_type?: string
         }
         Relationships: []
       }
@@ -843,17 +971,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      record_supplier_payment: {
+      correct_supplier_payment_vault: {
         Args: {
-          p_amount: number
-          p_method: string
-          p_note?: string | null
-          p_payment_date: string
-          p_preferred_purchase_id?: string | null
-          p_supplier_id: string
-          p_vault_user_id?: string | null
+          p_new_vault_user_id: string
+          p_reason: string
+          p_supplier_payment_id: string
         }
-        Returns: Json
+        Returns: string
       }
       has_role: {
         Args: {
@@ -861,6 +985,77 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      record_supplier_payment: {
+        Args: {
+          p_amount: number
+          p_method: string
+          p_note?: string
+          p_payment_date: string
+          p_preferred_purchase_id?: string
+          p_supplier_id: string
+          p_vault_user_id?: string
+        }
+        Returns: Json
+      }
+      record_vault_cash_movement: {
+        Args: {
+          p_amount: number
+          p_destination_vault_user_id: string
+          p_movement_date?: string
+          p_movement_type: string
+          p_note?: string
+          p_source_vault_user_id: string
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          destination_vault_user_id: string
+          id: string
+          movement_date: string
+          movement_type: string
+          note: string | null
+          source_vault_user_id: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vault_cash_movements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      vault_available_balance: {
+        Args: { p_vault_user_id: string }
+        Returns: number
+      }
+      void_vault_cash_movement: {
+        Args: { p_movement_id: string; p_reason: string }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          destination_vault_user_id: string
+          id: string
+          movement_date: string
+          movement_type: string
+          note: string | null
+          source_vault_user_id: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "vault_cash_movements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
@@ -880,12 +1075,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -909,11 +1104,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -934,11 +1129,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -959,11 +1154,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -976,11 +1171,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
