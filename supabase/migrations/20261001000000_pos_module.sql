@@ -1,9 +1,19 @@
+-- POS module schema and atomic sale workflow.
+-- Kept in Supabase migration history so fresh environments match production.
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'manual';
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS customer_name text;
 ALTER TABLE public.sales ADD COLUMN IF NOT EXISTS payment_method text;
-ALTER TABLE public.sales ADD CONSTRAINT sales_source_check CHECK (source IN ('manual','pos'));
 CREATE INDEX IF NOT EXISTS idx_sales_source ON public.sales(source, created_at DESC);
-ALTER TABLE public.products ADD CONSTRAINT products_selling_price_nonneg CHECK (default_selling_price >= 0) NOT VALID;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sales_source_check' AND conrelid = 'public.sales'::regclass) THEN
+    ALTER TABLE public.sales ADD CONSTRAINT sales_source_check CHECK (source IN ('manual','pos'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'products_selling_price_nonneg' AND conrelid = 'public.products'::regclass) THEN
+    ALTER TABLE public.products ADD CONSTRAINT products_selling_price_nonneg CHECK (default_selling_price >= 0) NOT VALID;
+  END IF;
+END $$;
+
 ALTER TABLE public.payments ALTER COLUMN restaurant_id DROP NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.list_business_cash_vaults()
@@ -32,7 +42,9 @@ BEGIN
   IF v_uid IS NULL OR NOT (public.has_role(v_uid,'admin') OR public.has_role(v_uid,'staff')) THEN
     RAISE EXCEPTION 'Not authorized';
   END IF;
-  IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN RAISE EXCEPTION 'Cart is empty'; END IF;
+  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
+    RAISE EXCEPTION 'Cart is empty';
+  END IF;
   IF p_method IS NULL OR p_method NOT IN ('cash','bank','upi','other') THEN RAISE EXCEPTION 'Invalid payment method'; END IF;
   IF v_disc < 0 THEN RAISE EXCEPTION 'Discount cannot be negative'; END IF;
 
@@ -42,7 +54,8 @@ BEGIN
     v_price := (v_item->>'unit_price')::numeric;
     IF v_qty IS NULL OR v_qty <= 0 THEN RAISE EXCEPTION 'Invalid quantity'; END IF;
     IF v_price IS NULL OR v_price < 0 THEN RAISE EXCEPTION 'Invalid price'; END IF;
-    SELECT current_stock, name, avg_cost INTO v_stock, v_name, v_avg FROM public.products WHERE id = v_pid FOR UPDATE;
+    SELECT current_stock, name, avg_cost INTO v_stock, v_name, v_avg
+      FROM public.products WHERE id = v_pid FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'Product not found'; END IF;
     IF v_qty > v_stock THEN RAISE EXCEPTION 'Insufficient stock for %: available %', v_name, v_stock; END IF;
     v_sub := v_sub + v_qty * v_price;
@@ -51,6 +64,12 @@ BEGIN
 
   IF v_disc > v_sub THEN RAISE EXCEPTION 'Discount exceeds subtotal'; END IF;
   v_grand := v_sub - v_disc;
+
+  IF v_grand > 0 AND p_vault_user_id IS NULL THEN RAISE EXCEPTION 'Business Cash Vault is required'; END IF;
+  IF p_vault_user_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.vault_users
+    WHERE id = p_vault_user_id AND is_active AND vault_type = 'business_cash'
+  ) THEN RAISE EXCEPTION 'Selected Business Cash Vault is not active'; END IF;
 
   INSERT INTO public.sales (restaurant_id, sale_date, subtotal, discount, tax, grand_total, total_cost, notes,
     created_by, amount_received, source, customer_name, payment_method)
@@ -64,12 +83,9 @@ BEGIN
   FROM jsonb_array_elements(p_items) e;
 
   IF v_grand > 0 THEN
-    -- vault validity enforced by require_active_business_cash_vault trigger
     INSERT INTO public.payments (restaurant_id, sale_id, payment_date, amount, method, note, created_by, vault_user_id)
     VALUES (NULL, v_sale.id, CURRENT_DATE, v_grand, p_method, 'POS ' || v_sale.invoice_no, v_uid, p_vault_user_id);
     UPDATE public.sales SET amount_received = v_grand WHERE id = v_sale.id;
-  ELSE
-    UPDATE public.sales SET amount_received = 0 WHERE id = v_sale.id;
   END IF;
 
   RETURN jsonb_build_object('id', v_sale.id, 'invoice_no', v_sale.invoice_no);
