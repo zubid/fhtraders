@@ -41,7 +41,7 @@ function SalesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("*, restaurants(name), sale_items(id, quantity, unit_price, line_total, products(name, unit))")
+        .select("*, restaurants(name), sale_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
         .order("sale_date", { ascending: false });
       if (error) throw error;
       return data;
