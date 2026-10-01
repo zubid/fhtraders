@@ -231,13 +231,17 @@ function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
     queryKey: ["pos-history"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("sales") as any)
-        .select("id,invoice_no,created_at,customer_name,grand_total,payment_method,created_by,is_voided,void_reason,sale_items(product_id,quantity,unit_price,products(name,unit))")
-        .eq("source", "pos").order("created_at", { ascending: false }).limit(100);
+        .select("id,invoice_no,created_at,customer_name,grand_total,payment_method,created_by,is_voided,void_reason,source,restaurant_id,sale_items(id,product_id,quantity,unit_price,line_total,products(name,unit))")
+        .order("created_at", { ascending: false }).limit(250);
+      // Some Lovable-managed databases contain POS rows created before source tagging
+      // was applied consistently. A POS sale is either explicitly tagged, or is a
+      // walk-in sale with no restaurant and a POS payment method.
+      const rows = (data ?? []).filter((s:any) => s.source === "pos" || (!s.restaurant_id && !!s.payment_method));
       if (error) throw error;
-      const ids = [...new Set((data ?? []).map((s: any) => s.created_by).filter(Boolean))] as string[];
+      const ids = [...new Set(rows.map((s: any) => s.created_by).filter(Boolean))] as string[];
       const { data: profs } = ids.length ? await supabase.from("profiles").select("id,full_name,email").in("id", ids) : { data: [] as any[] };
       const map = new Map((profs ?? []).map((p: any) => [p.id, p.full_name || p.email]));
-      return (data ?? []).map((s: any) => ({ ...s, cashier: map.get(s.created_by) ?? "-" }));
+      return rows.map((s: any) => ({ ...s, cashier: map.get(s.created_by) ?? "-" }));
     },
   });
   return (
