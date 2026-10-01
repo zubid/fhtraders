@@ -43,6 +43,7 @@ function VaultPage() {
   const { data: expenses } = get("vault_expenses_all", "expenses", "id,vault_user_id,amount");
   const { data: receipts } = get("vault_customer_payments_all", "payments", "id,vault_user_id,amount");
   const { data: supplierPayments } = get("vault_supplier_payments_all", "supplier_payments", "id,vault_user_id,amount,purchase_id");
+  const { data: refundAdjustments } = get("vault_refund_adjustments_all", "vault_adjustments", "id,vault_user_id,amount,adjustment_type");
   const { data: movements } = useQuery({ queryKey: ["vault_cash_movements"], queryFn: async () => { const { data, error } = await (supabase.from("vault_cash_movements" as any) as any).select("*").order("movement_date", { ascending: false }).order("created_at", { ascending: false }); if (error) throw error; return (data ?? []) as any[]; } });
 
   const splitIds = useMemo(() => { const map = new Map<string, Set<string>>(); for (const x of supplierPayments ?? []) if (x.purchase_id && x.vault_user_id) { if (!map.has(x.purchase_id)) map.set(x.purchase_id, new Set()); map.get(x.purchase_id)!.add(x.vault_user_id); } return new Set([...map].filter(([, ids]) => ids.size > 1).map(([id]) => id)); }, [supplierPayments]);
@@ -54,7 +55,9 @@ function VaultPage() {
     const expense = (expenses ?? []).filter(x => x.vault_user_id === id).reduce((n,x)=>n+Number(x.amount),0);
     const cashIn = (movements ?? []).filter(x => !x.voided_at && x.destination_vault_user_id === id).reduce((n,x)=>n+Number(x.amount),0);
     const cashOut = (movements ?? []).filter(x => !x.voided_at && x.source_vault_user_id === id).reduce((n,x)=>n+Number(x.amount),0);
-    return { topup, received, spend: purchase + split + expense, cashIn, cashOut };
+    const supplierRefunds=(refundAdjustments??[]).filter((x:any)=>x.vault_user_id===id&&x.adjustment_type==="supplier_refund").reduce((n:number,x:any)=>n+Number(x.amount),0);
+    const customerRefunds=(refundAdjustments??[]).filter((x:any)=>x.vault_user_id===id&&x.adjustment_type==="customer_refund").reduce((n:number,x:any)=>n+Number(x.amount),0);
+    return { topup, received, spend: purchase + split + expense, cashIn: cashIn+supplierRefunds, cashOut: cashOut+customerRefunds };
   };
   const rows = (users ?? []).map(u => { const s=sums(u.id); return { ...u, ...s, balance:Number(u.opening_balance)+s.topup+s.received+s.cashIn-s.cashOut-s.spend }; });
   const businessCash = rows.filter(x=>x.vault_type!=="owner_cash").reduce((n,x)=>n+x.balance,0);
