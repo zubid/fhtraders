@@ -54,6 +54,7 @@ const catalogItems = [
 
 const adminItems = [
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Activity Log", url: "/activity", icon: ScrollText },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
