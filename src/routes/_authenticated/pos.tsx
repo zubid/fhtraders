@@ -10,6 +10,7 @@ import { formatCurrency, formatNumber } from "@/lib/format";
 import { printPosReceipt } from "@/lib/print";
 import { PageHeader } from "@/components/app/PageHeader";
 import { PosAdjustmentDialog } from "@/components/app/PosAdjustmentDialog";
+import { AdjustmentReport } from "@/components/app/AdjustmentReport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,7 +135,7 @@ function PosPage() {
     <div>
       <PageHeader title="POS" description={`Counter sales · ${user?.email ?? ""}`} />
       <Tabs defaultValue="sell">
-        <TabsList className="mb-4"><TabsTrigger value="sell">Sell</TabsTrigger><TabsTrigger value="history">History</TabsTrigger></TabsList>
+        <TabsList className="mb-4"><TabsTrigger value="sell">Sell</TabsTrigger><TabsTrigger value="history">History</TabsTrigger><TabsTrigger value="audit">Adjustments & Returns</TabsTrigger></TabsList>
         <TabsContent value="sell">
           <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
             <Card className="p-4">
@@ -218,7 +219,7 @@ function PosPage() {
             </Card>
           </div>
         </TabsContent>
-        <TabsContent value="history"><PosHistory onPrint={reprint} /></TabsContent>
+        <TabsContent value="history"><PosHistory onPrint={reprint} /></TabsContent><TabsContent value="audit"><AdjustmentReport /></TabsContent>
       </Tabs>
     </div>
   );
