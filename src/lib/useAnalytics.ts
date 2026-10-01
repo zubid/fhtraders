@@ -34,6 +34,7 @@ export function useAnalytics(from: string, to: string) {
   const supplierPayments = useQuery({ queryKey: ["report-vault-supplier-payments"], queryFn: () => query("supplier_payments", "purchase_id,vault_user_id,amount") });
   const periodTopups = useQuery({ queryKey: ["report-period-topups", from, to], queryFn: () => query("vault_topups", "vault_user_id,amount,topup_date,vault_users(name)", "topup_date", from, to) });
   const periodSupplierPayments = useQuery({ queryKey: ["report-period-supplier-payments", from, to], queryFn: () => query("supplier_payments", "purchase_id,vault_user_id,amount,payment_date", "payment_date", from, to) });
+  const refundAdjustments = useQuery({ queryKey: ["report-vault-refund-adjustments"], queryFn: () => query("vault_adjustments", "vault_user_id,amount,adjustment_type,created_at") });
   const cashMovements = useQuery({ queryKey: ["report-vault-cash-movements"], queryFn: () => query("vault_cash_movements", "source_vault_user_id,destination_vault_user_id,amount,movement_type,movement_date,voided_at") });
   const periodOwnerDistributions = useQuery({ queryKey: ["report-owner-distributions", from, to], queryFn: () => query("vault_cash_movements", "amount,movement_type,movement_date,voided_at", "movement_date", from, to) });
 
@@ -75,6 +76,8 @@ export function useAnalytics(from: string, to: string) {
       const expenseSpend = (vaultExpenses.data ?? []).filter((x) => x.vault_user_id === user.id).reduce((n, x) => n + Number(x.amount), 0);
       const movementIn = (cashMovements.data ?? []).filter((x:any) => !x.voided_at && x.destination_vault_user_id === user.id).reduce((n:number,x:any)=>n+Number(x.amount),0);
       const movementOut = (cashMovements.data ?? []).filter((x:any) => !x.voided_at && x.source_vault_user_id === user.id).reduce((n:number,x:any)=>n+Number(x.amount),0);
+      const supplierRefunds=(refundAdjustments.data??[]).filter((x:any)=>x.vault_user_id===user.id&&x.adjustment_type==="supplier_refund").reduce((n:number,x:any)=>n+Number(x.amount),0);
+      const customerRefunds=(refundAdjustments.data??[]).filter((x:any)=>x.vault_user_id===user.id&&x.adjustment_type==="customer_refund").reduce((n:number,x:any)=>n+Number(x.amount),0);
       return opening + added + received + movementIn - purchaseSpend - splitSpend - expenseSpend - movementOut;
     };
     const currentCashOnHand = (vaultUsers.data ?? []).filter((u:any)=>u.vault_type !== "owner_cash").reduce((total,user)=>total+vaultBalance(user),0);
@@ -120,8 +123,8 @@ export function useAnalytics(from: string, to: string) {
       byRestaurant: [...byRestaurant.values()].map((r) => ({ ...r, profit: r.sales - r.cost })).sort((a, b) => b.sales - a.sales),
       byCategory: [...byCategory].map(([name, v]) => ({ name, ...v, profit: v.revenue - v.cost })).sort((a, b) => b.revenue - a.revenue),
     };
-  }, [sales.data, purchases.data, expenses.data, payments.data, allSales.data, allPurchases.data, products.data, vaultUsers.data, topups.data, vaultPurchases.data, vaultExpenses.data, allPayments.data, supplierPayments.data, periodTopups.data, periodSupplierPayments.data, cashMovements.data, periodOwnerDistributions.data]);
+  }, [sales.data, purchases.data, expenses.data, payments.data, allSales.data, allPurchases.data, products.data, vaultUsers.data, topups.data, vaultPurchases.data, vaultExpenses.data, allPayments.data, supplierPayments.data, periodTopups.data, periodSupplierPayments.data, cashMovements.data, refundAdjustments.data, periodOwnerDistributions.data]);
 
-  const queries = [sales, purchases, expenses, payments, allSales, allPurchases, products, vaultUsers, topups, vaultPurchases, vaultExpenses, allPayments, supplierPayments, periodTopups, periodSupplierPayments, cashMovements, periodOwnerDistributions];
+  const queries = [sales, purchases, expenses, payments, allSales, allPurchases, products, vaultUsers, topups, vaultPurchases, vaultExpenses, allPayments, supplierPayments, periodTopups, periodSupplierPayments, cashMovements, refundAdjustments, periodOwnerDistributions];
   return { ...derived, isLoading: queries.some((q) => q.isLoading) };
 }
