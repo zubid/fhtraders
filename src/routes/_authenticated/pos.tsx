@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Search, Minus, Plus, Trash2, Loader2, Printer, ShoppingBag } from "lucide-react";
+import { Search, Minus, Plus, Trash2, Loader2, Printer, ShoppingBag, Pencil, ShieldX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { METHOD_LABELS, PAYMENT_METHODS } from "@/lib/credit";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { printPosReceipt } from "@/lib/print";
 import { PageHeader } from "@/components/app/PageHeader";
+import { PosAdjustmentDialog } from "@/components/app/PosAdjustmentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -224,11 +225,12 @@ function PosPage() {
 }
 
 function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
+  const [adjust,setAdjust]=useState<{sale:any;mode:"item_less"|"delete"}|null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["pos-history"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("sales") as any)
-        .select("id,invoice_no,created_at,customer_name,grand_total,payment_method,created_by")
+        .select("id,invoice_no,created_at,customer_name,grand_total,payment_method,created_by,is_voided,void_reason,sale_items(product_id,quantity,unit_price,products(name,unit))")
         .eq("source", "pos").order("created_at", { ascending: false }).limit(100);
       if (error) throw error;
       const ids = [...new Set((data ?? []).map((s: any) => s.created_by).filter(Boolean))] as string[];
@@ -251,12 +253,13 @@ function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
               <TableCell>{s.customer_name || "Walk-in Customer"}</TableCell>
               <TableCell><Badge variant="secondary">{METHOD_LABELS[s.payment_method] ?? s.payment_method}</Badge></TableCell>
               <TableCell>{s.cashier}</TableCell>
-              <TableCell className="text-right font-medium">{formatCurrency(s.grand_total)}</TableCell>
-              <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => onPrint(s.id)}><Printer className="h-4 w-4" /></Button></TableCell>
+              <TableCell className="text-right font-medium">{s.is_voided?<Badge variant="destructive">Deleted</Badge>:formatCurrency(s.grand_total)}</TableCell>
+              <TableCell className="text-right"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" onClick={() => onPrint(s.id)} disabled={s.is_voided}><Printer className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Edit / Item Less" onClick={()=>setAdjust({sale:s,mode:"item_less"})} disabled={s.is_voided}><Pencil className="h-4 w-4"/></Button><Button variant="ghost" size="icon" title="Delete POS Sale" onClick={()=>setAdjust({sale:s,mode:"delete"})} disabled={s.is_voided}><ShieldX className="h-4 w-4 text-destructive"/></Button></div></TableCell>
             </TableRow>
           ))}</TableBody>
         </Table></div>
       )}
+      {adjust&&<PosAdjustmentDialog open={!!adjust} onOpenChange={(v)=>!v&&setAdjust(null)} sale={adjust.sale} mode={adjust.mode}/>} 
     </Card>
   );
 }
