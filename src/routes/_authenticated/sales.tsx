@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, Printer, HandCoins, Pencil } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, HandCoins, Pencil, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
+import { ReturnDialog } from "@/components/app/ReturnDialog";
 import { PaymentStatusBadge } from "@/components/app/PaymentStatusBadge";
 import { ReceivePaymentDialog } from "@/components/app/ReceivePaymentDialog";
 import { saleBalance } from "@/lib/credit";
@@ -32,6 +33,7 @@ function SalesPage() {
   const [status, setStatus] = useState("all");
   const [toDelete, setToDelete] = useState<any>(null);
   const [view, setView] = useState<any>(null);
+  const [returnFor, setReturnFor] = useState<any>(null);
   const [pay, setPay] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
@@ -39,7 +41,7 @@ function SalesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("*, restaurants(name), sale_items(id, quantity, unit_price, line_total, products(name, unit))")
+        .select("*, restaurants(name), sale_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
         .order("sale_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -123,6 +125,7 @@ function SalesPage() {
                         {bal > 0 && s.restaurant_id && (
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
                         )}
+                        {isAdmin && <Button variant="ghost" size="icon" title="Return items" onClick={() => setReturnFor(s)}><RotateCcw className="h-4 w-4" /></Button>}
                         <Button variant="ghost" size="icon" onClick={() => setView(s)}><Eye className="h-4 w-4" /></Button>
                         {isAdmin && (
                           <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/sales/edit/$id" params={{ id: s.id }}><Pencil className="h-4 w-4" /></Link></Button>
@@ -183,6 +186,8 @@ function SalesPage() {
           presetSaleId={pay.id}
         />
       )}
+
+      {returnFor && <ReturnDialog open={!!returnFor} onOpenChange={(v)=>!v&&setReturnFor(null)} record={returnFor} kind="sale" />}
 
       <ConfirmDialog
         open={!!toDelete}

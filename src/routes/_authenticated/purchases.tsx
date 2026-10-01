@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Eye, Printer, HandCoins, Pencil } from "lucide-react";
+import { Plus, Trash2, Eye, Printer, HandCoins, Pencil, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
+import { ReturnDialog } from "@/components/app/ReturnDialog";
 import { PaymentStatusBadge } from "@/components/app/PaymentStatusBadge";
 import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
 import { purchaseBalance } from "@/lib/supplier-credit";
@@ -33,6 +34,7 @@ function PurchasesPage() {
   const [to, setTo] = useState("");
   const [toDelete, setToDelete] = useState<any>(null);
   const [view, setView] = useState<any>(null);
+  const [returnFor, setReturnFor] = useState<any>(null);
   const [payFor, setPayFor] = useState<any>(null);
   const [vaultFilter, setVaultFilter] = useState<string>("all");
 
@@ -41,7 +43,7 @@ function PurchasesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, suppliers(name), vault_users(name), purchase_items(id, quantity, unit_price, line_total, products(name, unit))")
+        .select("*, suppliers(name), vault_users(name), purchase_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
         .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data;
@@ -132,7 +134,8 @@ function PurchasesPage() {
                         isAdmin &&
                         <Button variant="ghost" size="icon" title="Pay" onClick={() => setPayFor(p)}><HandCoins className="h-4 w-4" /></Button>
                       )}
-                      <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
+                      {isAdmin && <Button variant="ghost" size="icon" title="Return to supplier" onClick={() => setReturnFor(p)}><Undo2 className="h-4 w-4" /></Button>}
+                        <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
                       {isAdmin && (
                         <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/purchases/edit/$id" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link></Button>
                       )}
@@ -174,6 +177,8 @@ function PurchasesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {returnFor && <ReturnDialog open={!!returnFor} onOpenChange={(v)=>!v&&setReturnFor(null)} record={returnFor} kind="supplier" />}
 
       <ConfirmDialog
         open={!!toDelete}

@@ -45,6 +45,7 @@ function SettingsPage() {
 
   const [form, setForm] = useState({ ...DEFAULT_BRANDING });
   const [pw, setPw] = useState({ next: "", confirm: "" });
+  const [posPw, setPosPw] = useState({ next: "", confirm: "" });
   const [wipeOpen, setWipeOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [newUser, setNewUser] = useState({ full_name: "", email: "", password: "", role: "staff" as "admin" | "staff" });
@@ -98,6 +99,8 @@ function SettingsPage() {
     onSuccess: () => { setPw({ next: "", confirm: "" }); toast.success("Password updated"); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const changePosPw = useMutation({mutationFn:async()=>{if(posPw.next.length<4)throw new Error("POS authorization password must be at least 4 characters");if(posPw.next!==posPw.confirm)throw new Error("Passwords do not match");const {error}=await (supabase.rpc as any)("set_pos_authorization_password",{p_password:posPw.next});if(error)throw error;},onSuccess:()=>{setPosPw({next:"",confirm:""});toast.success("POS authorization password updated")},onError:(e:Error)=>toast.error(e.message)});
 
   // ---- user management ----
   const { data: users } = useQuery({
@@ -235,6 +238,7 @@ function SettingsPage() {
               <Button onClick={() => changePw.mutate()} disabled={changePw.isPending}>Update Password</Button>
             </CardContent>
           </Card>
+          <Card className="mt-4 max-w-md"><CardHeader><CardTitle className="text-base flex items-center gap-2"><ShieldAlert className="h-4 w-4"/>POS Adjustment Authorization</CardTitle><CardDescription>Protects POS Edit / Item Less and Delete. Initial password is 12345.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="space-y-2"><Label>New POS Password</Label><Input type="password" value={posPw.next} onChange={e=>setPosPw({...posPw,next:e.target.value})}/></div><div className="space-y-2"><Label>Confirm POS Password</Label><Input type="password" value={posPw.confirm} onChange={e=>setPosPw({...posPw,confirm:e.target.value})}/></div><Button onClick={()=>changePosPw.mutate()} disabled={changePosPw.isPending}>Update POS Password</Button></CardContent></Card>
         </TabsContent>
 
         <TabsContent value="users">
