@@ -16,7 +16,7 @@ import {
   Settings,
   Truck,
   Vault,
-  MonitorSmartphone,
+  MonitorSmartphone, ScrollText,
 } from "lucide-react";
 import {
   Sidebar,
