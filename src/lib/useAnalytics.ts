@@ -19,11 +19,11 @@ const query = async (table: string, select: string, dateField?: string, from?: s
 };
 
 export function useAnalytics(from: string, to: string) {
-  const sales = useQuery({ queryKey: ["report-sales", from, to], queryFn: () => query("sales", "id,sale_date,invoice_no,grand_total,amount_received,total_cost,source,customer_name,restaurants(name),sale_items(quantity,line_total,cost_price,products(name,categories(name)))", "sale_date", from, to) });
+  const sales = useQuery({ queryKey: ["report-sales", from, to], queryFn: () => query("sales", "id,sale_date,invoice_no,grand_total,amount_received,total_cost,source,customer_name,is_voided,restaurants(name),sale_items(quantity,line_total,cost_price,products(name,categories(name)))", "sale_date", from, to) });
   const purchases = useQuery({ queryKey: ["report-purchases", from, to], queryFn: () => query("purchases", "id,purchase_date,reference_no,grand_total,amount_paid,suppliers(name)", "purchase_date", from, to) });
   const expenses = useQuery({ queryKey: ["report-expenses", from, to], queryFn: () => query("expenses", "id,expense_date,type,amount,description,expense_categories(name,accounting_class),employees(name),vault_users(name)", "expense_date", from, to) });
   const payments = useQuery({ queryKey: ["report-payments", from, to], queryFn: () => query("payments", "id,payment_date,amount,method,note,restaurants(name),sales(invoice_no),vault_users(name)", "payment_date", from, to) });
-  const allSales = useQuery({ queryKey: ["report-current-receivables"], queryFn: () => query("sales", "grand_total,amount_received,source,customer_name,restaurants(name)") });
+  const allSales = useQuery({ queryKey: ["report-current-receivables"], queryFn: () => query("sales", "grand_total,amount_received,source,customer_name,is_voided,restaurants(name)") });
   const allPurchases = useQuery({ queryKey: ["report-current-payables"], queryFn: () => query("purchases", "grand_total,amount_paid,suppliers(name)") });
   const products = useQuery({ queryKey: ["report-current-inventory"], queryFn: () => query("products", "id,name,current_stock,avg_cost,reorder_level,categories(name)") });
   const vaultUsers = useQuery({ queryKey: ["report-vault-users"], queryFn: () => query("vault_users", "id,opening_balance,vault_type") });
@@ -38,7 +38,7 @@ export function useAnalytics(from: string, to: string) {
   const periodOwnerDistributions = useQuery({ queryKey: ["report-owner-distributions", from, to], queryFn: () => query("vault_cash_movements", "amount,movement_type,movement_date,voided_at", "movement_date", from, to) });
 
   const derived = useMemo(() => {
-    const s = sales.data ?? [], p = purchases.data ?? [], ex = expenses.data ?? [], receipts = payments.data ?? [];
+    const s = (sales.data ?? []).filter((x:any)=>!x.is_voided), p = purchases.data ?? [], ex = expenses.data ?? [], receipts = payments.data ?? [];
     const totalSales = s.reduce((sum, row) => sum + Number(row.grand_total), 0);
     const totalCost = s.reduce((sum, row) => {
       const itemCost = (row.sale_items ?? []).reduce((n: number, item: any) => n + Number(item.cost_price) * Number(item.quantity), 0);
@@ -49,7 +49,7 @@ export function useAnalytics(from: string, to: string) {
     const grossProfit = totalSales - totalCost;
     const totalPurchases = p.reduce((sum, row) => sum + Number(row.grand_total), 0);
     const margin = totalSales > 0 ? grossProfit / totalSales * 100 : 0;
-    const outstanding = (allSales.data ?? []).reduce((sum, row) => sum + Math.max(Number(row.grand_total) - Number(row.amount_received), 0), 0);
+    const outstanding = (allSales.data ?? []).filter((x:any)=>!x.is_voided).reduce((sum, row) => sum + Math.max(Number(row.grand_total) - Number(row.amount_received), 0), 0);
     const supplierPayables = (allPurchases.data ?? []).reduce((sum, row) => sum + Math.max(Number(row.grand_total) - Number(row.amount_paid), 0), 0);
     const customerCashReceived = receipts.reduce((sum, row) => sum + Number(row.amount), 0);
     const generalOperatingExpenses = ex.filter((row) => row.type !== "salary" && expenseClass(row) === "opex").reduce((sum, row) => sum + Number(row.amount), 0);
