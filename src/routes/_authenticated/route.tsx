@@ -31,14 +31,13 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
     // Initial/reference refresh is best-effort. A network failure must never block the desktop UI.
-    bootstrapDesktopReferenceData().catch((error) => console.warn("[Desktop] Local bootstrap deferred:", error));
+    syncPendingPosSales().then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Sync/bootstrap deferred:", error));
   }, [loading, session]);
 
   useEffect(() => {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
-    const sync = () => void syncPendingPosSales();
+    const sync = () => void syncPendingPosSales().then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Reconnect sync deferred:", error));
     window.addEventListener("online", sync);
-    sync();
     return () => window.removeEventListener("online", sync);
   }, [loading, session]);
 
