@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { paySupplier, PAYMENT_METHODS, METHOD_LABELS } from "@/lib/supplier-credit";
 import { ProductSearchPicker } from "@/components/app/ProductSearchPicker";
+import { createDesktopPurchase, getDesktopPurchaseData } from "@/lib/desktop-purchases";
+import { isDesktop } from "@/lib/desktop-pos";
 
 export const Route = createFileRoute("/_authenticated/purchases_/new")({
   component: NewPurchase,
@@ -34,19 +36,20 @@ function NewPurchase() {
   const defaultDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const isDirty = !!supplierId || !!newSupplier.trim() || lines.length > 0 || splits.length > 0 || !!notes.trim() || date !== defaultDate;
   const { allowNavigation } = useUnsavedChangesGuard(isDirty);
+  const desktop = isDesktop();
 
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: async () => (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
+    queryFn: async () => desktop ? (await getDesktopPurchaseData())?.suppliers ?? [] : (await supabase.from("suppliers").select("id,name").order("name")).data ?? [],
   });
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopPurchaseData())?.vaults ?? [] :
       ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
   const { data: products } = useQuery({
     queryKey: ["products-picker"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopPurchaseData())?.products ?? [] :
       (await supabase.from("products").select("id,name,unit,sku,current_stock,categories(name)").order("name")).data ?? [],
   });
 
@@ -79,6 +82,17 @@ function NewPurchase() {
       if (activeSplits.some((split) => !split.method)) throw new Error("Select a Payment Method for every payment.");
       const paidNow = activeSplits.reduce((s, p) => s + Number(p.amount), 0);
       if (paidNow > grandTotal + 0.001) throw new Error("Paid amount cannot exceed the grand total");
+      if (desktop) {
+        const purchase = await createDesktopPurchase({
+          supplier_id: supplierId || null,
+          new_supplier_name: supplierId ? null : newSupplier.trim(),
+          purchase_date: date,
+          notes: notes || null,
+          items: lines.map((l) => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price })),
+          payments: activeSplits.map((s) => ({ vault_user_id: s.vault_user_id, amount: Number(s.amount), method: s.method })),
+        });
+        return { purchaseId: purchase.id, initialPaymentFailed: false, offlineLocal: purchase.sync_status !== "synced" };
+      }
       let sid = supplierId || null;
       if (!sid && newSupplier.trim()) {
         const { data, error } = await supabase.from("suppliers").insert({ name: newSupplier.trim() }).select("id").single();
@@ -117,7 +131,7 @@ function NewPurchase() {
       }
       return { purchaseId: purchase.id, initialPaymentFailed: false };
     },
-    onSuccess: ({ purchaseId, initialPaymentFailed }) => {
+    onSuccess: ({ purchaseId, initialPaymentFailed, offlineLocal }: any) => {
       qc.invalidateQueries();
       allowNavigation();
       if (initialPaymentFailed) {
@@ -125,7 +139,7 @@ function NewPurchase() {
         toast.warning("Purchase saved, but an initial payment could not be recorded");
         navigate({ to: "/purchases/edit/$id", params: { id: purchaseId } });
       } else {
-        toast.success("Purchase saved · stock updated");
+        toast.success(offlineLocal ? "Purchase saved locally · stock updated · sync queued" : "Purchase saved · stock updated");
         navigate({ to: "/purchases" });
       }
     },
