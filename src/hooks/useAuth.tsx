@@ -22,20 +22,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const roles = (data ?? []).map((r) => r.role);
-    setRole(roles.includes("admin") ? "admin" : roles.includes("staff") ? "staff" : "staff");
+  const fetchRole = async (userId: string, email?: string) => {
+    try {
+      const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+      if (error) throw error;
+      const roles = (data ?? []).map((r) => r.role);
+      const resolved: Exclude<Role, null> = roles.includes("admin") ? "admin" : "staff";
+      setRole(resolved);
+      if (window.fhDesktop?.isDesktop) await window.fhDesktop.cacheAuthRole(userId, resolved, email);
+      return;
+    } catch (error) {
+      if (window.fhDesktop?.isDesktop) {
+        const cached = await window.fhDesktop.getCachedAuthRole(userId);
+        if (cached?.role === "admin" || cached?.role === "staff") { setRole(cached.role); return; }
+      }
+      setRole(null);
+      console.warn("[Auth] Role could not be verified online or from desktop cache", error);
+    }
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
-        setTimeout(() => fetchRole(newSession.user.id), 0);
+        setTimeout(() => fetchRole(newSession.user.id, newSession.user.email), 0);
       } else {
         setRole(null);
       }
@@ -44,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       if (data.session?.user) {
-        fetchRole(data.session.user.id).finally(() => setLoading(false));
+        fetchRole(data.session.user.id, data.session.user.email).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -71,8 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setRole(null);
+    const userId=session?.user?.id;
+    try { await supabase.auth.signOut(); } finally {
+      if(userId&&window.fhDesktop?.isDesktop) await window.fhDesktop.clearCachedAuthRole(userId);
+      setRole(null);
+    }
   };
 
   return (
