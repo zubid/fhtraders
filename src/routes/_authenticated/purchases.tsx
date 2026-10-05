@@ -22,6 +22,9 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getLocalPurchases } from "@/lib/desktop-purchases";
+import { isDesktop } from "@/lib/desktop-pos";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_authenticated/purchases")({
   component: PurchasesPage,
@@ -41,12 +44,16 @@ function PurchasesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["purchases"],
     queryFn: async () => {
+      const desktop = isDesktop();
+      const local = desktop ? await getLocalPurchases() : [];
+      if (desktop && !navigator.onLine) return local;
       const { data, error } = await supabase
         .from("purchases")
         .select("*, suppliers(name), vault_users(name), purchase_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
         .order("purchase_date", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) { if (desktop) return local; throw error; }
+      const pendingLocal = local.filter((p:any) => p.sync_status !== "synced");
+      return [...pendingLocal, ...(data ?? [])] as any[];
     },
   });
   const { data: vaultUsers } = useQuery({
@@ -120,7 +127,7 @@ function PurchasesPage() {
               <TableBody>
                 {filtered.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-mono text-xs">{p.reference_no}</TableCell>
+                    <TableCell className="font-mono text-xs">{p.reference_no}{(p as any).is_local && <Badge variant={(p as any).sync_status==="failed"?"destructive":"secondary"} className="ml-2">{(p as any).sync_status}</Badge>}</TableCell>
                     <TableCell>{formatDate(p.purchase_date)}</TableCell>
                     <TableCell>{p.suppliers?.name ?? "-"}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{(p as any).vault_users?.name ?? "-"}</TableCell>
@@ -130,17 +137,17 @@ function PurchasesPage() {
                     <TableCell className="text-right">{formatCurrency(purchaseBalance(p as any))}</TableCell>
                     <TableCell><PaymentStatusBadge status={(p as any).payment_status ?? "unpaid"} /></TableCell>
                     <TableCell className="text-right">
-                      {p.supplier_id && purchaseBalance(p as any) > 0.001 && (
+                      {!(p as any).is_local && p.supplier_id && purchaseBalance(p as any) > 0.001 && (
                         isAdmin &&
                         <Button variant="ghost" size="icon" title="Pay" onClick={() => setPayFor(p)}><HandCoins className="h-4 w-4" /></Button>
                       )}
-                      {isAdmin && <Button variant="ghost" size="icon" title="Return to supplier" onClick={() => setReturnFor(p)}><Undo2 className="h-4 w-4" /></Button>}
+                      {isAdmin && !(p as any).is_local && <Button variant="ghost" size="icon" title="Return to supplier" onClick={() => setReturnFor(p)}><Undo2 className="h-4 w-4" /></Button>}
                         <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
-                      {isAdmin && (
+                      {isAdmin && !(p as any).is_local && (
                         <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/purchases/edit/$id" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link></Button>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => printPurchase(p)}><Printer className="h-4 w-4" /></Button>
-                      {isAdmin && (
+                      {isAdmin && !(p as any).is_local && (
                         <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       )}
                     </TableCell>
