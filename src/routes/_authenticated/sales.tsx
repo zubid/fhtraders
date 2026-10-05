@@ -129,7 +129,7 @@ function SalesPage() {
                       <TableCell className="text-right font-medium">{formatCurrency(bal)}</TableCell>
                       <TableCell>{Number(s.grand_total) === 0 ? <span className="text-xs font-medium text-muted-foreground">Returned / Closed</span> : <PaymentStatusBadge status={s.payment_status} />}</TableCell>
                       <TableCell className="text-right">
-                        {bal > 0 && s.restaurant_id && (
+                        {!(s as any).is_local && bal > 0 && s.restaurant_id && (
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
                         )}
                         {isAdmin && !(s as any).is_local && <Button variant="ghost" size="icon" title="Return items" onClick={() => setReturnFor(s)}><RotateCcw className="h-4 w-4" /></Button>}
