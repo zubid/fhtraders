@@ -20,6 +20,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { getLocalNormalSales } from "@/lib/desktop-sales";
+import { isDesktop } from "@/lib/desktop-pos";
 
 export const Route = createFileRoute("/_authenticated/sales")({
   component: SalesPage,
@@ -39,12 +42,16 @@ function SalesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["sales"],
     queryFn: async () => {
+      const desktop = isDesktop();
+      const local = desktop ? await getLocalNormalSales() : [];
+      if (desktop && !navigator.onLine) return local;
       const { data, error } = await supabase
         .from("sales")
         .select("*, restaurants(name), sale_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
+        .eq("source", "manual")
         .order("sale_date", { ascending: false });
-      if (error) throw error;
-      return data;
+      if (error) { if (desktop) return local; throw error; }
+      return [...local.filter((s:any)=>s.sync_status!=="synced"), ...(data ?? [])] as any[];
     },
   });
 
@@ -114,7 +121,7 @@ function SalesPage() {
                   const bal = saleBalance(s);
                   return (
                     <TableRow key={s.id}>
-                      <TableCell className="font-mono text-xs">{s.invoice_no}</TableCell>
+                      <TableCell className="font-mono text-xs">{s.invoice_no}{(s as any).is_local && <Badge variant={(s as any).sync_status==="failed"?"destructive":"secondary"} className="ml-2">{(s as any).sync_status}</Badge>}</TableCell>
                       <TableCell>{formatDate(s.sale_date)}</TableCell>
                       <TableCell>{s.restaurants?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(s.grand_total)}</TableCell>
@@ -122,16 +129,16 @@ function SalesPage() {
                       <TableCell className="text-right font-medium">{formatCurrency(bal)}</TableCell>
                       <TableCell>{Number(s.grand_total) === 0 ? <span className="text-xs font-medium text-muted-foreground">Returned / Closed</span> : <PaymentStatusBadge status={s.payment_status} />}</TableCell>
                       <TableCell className="text-right">
-                        {bal > 0 && s.restaurant_id && (
+                        {!(s as any).is_local && bal > 0 && s.restaurant_id && (
                           <Button variant="ghost" size="icon" title="Receive payment" onClick={() => setPay(s)}><HandCoins className="h-4 w-4 text-success" /></Button>
                         )}
-                        {isAdmin && <Button variant="ghost" size="icon" title="Return items" onClick={() => setReturnFor(s)}><RotateCcw className="h-4 w-4" /></Button>}
+                        {isAdmin && !(s as any).is_local && <Button variant="ghost" size="icon" title="Return items" onClick={() => setReturnFor(s)}><RotateCcw className="h-4 w-4" /></Button>}
                         <Button variant="ghost" size="icon" onClick={() => setView(s)}><Eye className="h-4 w-4" /></Button>
-                        {isAdmin && (
+                        {isAdmin && !(s as any).is_local && (
                           <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/sales/edit/$id" params={{ id: s.id }}><Pencil className="h-4 w-4" /></Link></Button>
                         )}
                         <Button variant="ghost" size="icon" onClick={() => printInvoice(s)}><Printer className="h-4 w-4" /></Button>
-                        {isAdmin && (
+                        {isAdmin && !(s as any).is_local && (
                           <Button variant="ghost" size="icon" onClick={() => setToDelete(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                         )}
                       </TableCell>
