@@ -1,0 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+export type BootstrapResult={skipped:boolean;reason?:string;imported?:number;counts?:Record<string,number>};
+async function fetchAll(table:string){const {data,error}=await supabase.from(table as any).select("*");if(error)throw error;return data??[]}
+export async function bootstrapDesktopReferenceData():Promise<BootstrapResult>{if(typeof window==="undefined"||!window.fhDesktop?.isDesktop)return {skipped:true,reason:"Not running in desktop mode"};const [categories,products,restaurants,suppliers]=await Promise.all([fetchAll("categories"),fetchAll("products"),fetchAll("restaurants"),fetchAll("suppliers")]);const result=await window.fhDesktop.bootstrapLocalData({categories,products,restaurants,suppliers});return {skipped:false,imported:result.imported,counts:result.counts}}
+export async function getDesktopLocalStatus(){if(typeof window==="undefined"||!window.fhDesktop?.isDesktop)return null;return window.fhDesktop.getLocalDbStatus()}

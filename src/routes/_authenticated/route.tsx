@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/s
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import { bootstrapDesktopReferenceData } from "@/lib/desktop-bootstrap";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -25,6 +26,12 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (!loading && session && role && blocked) navigate({ to: "/stock", replace: true });
   }, [loading, session, role, blocked, navigate]);
+
+  useEffect(() => {
+    if (loading || !session || !window.fhDesktop?.isDesktop) return;
+    // Initial/reference refresh is best-effort. A network failure must never block the desktop UI.
+    bootstrapDesktopReferenceData().catch((error) => console.warn("[Desktop] Local bootstrap deferred:", error));
+  }, [loading, session]);
 
   if (loading || !session || blocked) {
     return (
