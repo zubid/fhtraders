@@ -1,0 +1,1 @@
+const {contextBridge,ipcRenderer}=require("electron");contextBridge.exposeInMainWorld("fhDesktop",{isDesktop:true,getState:()=>ipcRenderer.invoke("desktop:get-state"),getStoragePath:()=>ipcRenderer.invoke("desktop:get-storage-path")});
