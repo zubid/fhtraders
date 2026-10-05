@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app/AppSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import { bootstrapDesktopReferenceData } from "@/lib/desktop-bootstrap";
+import { syncPendingPosSales } from "@/lib/desktop-pos";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -31,6 +32,14 @@ function AuthenticatedLayout() {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
     // Initial/reference refresh is best-effort. A network failure must never block the desktop UI.
     bootstrapDesktopReferenceData().catch((error) => console.warn("[Desktop] Local bootstrap deferred:", error));
+  }, [loading, session]);
+
+  useEffect(() => {
+    if (loading || !session || !window.fhDesktop?.isDesktop) return;
+    const sync = () => void syncPendingPosSales();
+    window.addEventListener("online", sync);
+    sync();
+    return () => window.removeEventListener("online", sync);
   }, [loading, session]);
 
   if (loading || !session || blocked) {
