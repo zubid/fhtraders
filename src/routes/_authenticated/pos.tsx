@@ -11,6 +11,7 @@ import { printPosReceipt } from "@/lib/print";
 import { PageHeader } from "@/components/app/PageHeader";
 import { PosAdjustmentDialog } from "@/components/app/PosAdjustmentDialog";
 import { AdjustmentReport } from "@/components/app/AdjustmentReport";
+import { createDesktopPosSale, getDesktopPosData, getDesktopReceipt, isDesktop, syncPendingPosSales } from "@/lib/desktop-pos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,7 @@ function PosPage() {
   const { data: products } = useQuery({
     queryKey: ["pos-products"],
     queryFn: async () => {
+      if (isDesktop()) return ((await getDesktopPosData())?.products ?? []) as Product[];
       const { data, error } = await supabase.from("products").select("id,name,sku,unit,current_stock,default_selling_price,category_id").order("name");
       if (error) throw error;
       return data as Product[];
@@ -51,11 +53,12 @@ function PosPage() {
   });
   const { data: categories } = useQuery({
     queryKey: ["categories"],
-    queryFn: async () => (await supabase.from("categories").select("id,name").order("name")).data ?? [],
+    queryFn: async () => isDesktop() ? ((await getDesktopPosData())?.categories ?? []) : ((await supabase.from("categories").select("id,name").order("name")).data ?? []),
   });
   const { data: vaults } = useQuery({
     queryKey: ["pos-vaults"],
     queryFn: async () => {
+      if (isDesktop()) return ((await getDesktopPosData())?.vaults ?? []) as { id:string; name:string }[];
       const { data, error } = await (supabase.rpc as any)("list_business_cash_vaults");
       if (error) throw error;
       return (data ?? []) as { id: string; name: string }[];
@@ -97,6 +100,12 @@ function PosPage() {
       if (discount > subtotal) throw new Error("Discount exceeds subtotal");
       if (grand > 0 && !vaultId) throw new Error("Select the Business Cash Vault receiving the money");
       if (tendered !== "" && Number(tendered) < grand) throw new Error("Amount tendered is less than total");
+      if (isDesktop()) {
+        return createDesktopPosSale({
+          items: cart.map((l) => ({ product_id:l.product_id, quantity:l.quantity, unit_price:l.unit_price })),
+          customer_name:customer, discount, payment_method:method, vault_user_id:vaultId||null, cashier:user?.email??"-",
+        });
+      }
       const { data, error } = await (supabase.rpc as any)("create_pos_sale", {
         p_items: cart.map((l) => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price })),
         p_customer_name: customer, p_discount: discount, p_method: method, p_vault_user_id: vaultId || null, p_note: null,
@@ -105,16 +114,18 @@ function PosPage() {
       return data as { id: string; invoice_no: string };
     },
     onSuccess: async (res) => {
-      toast.success(`Sale ${res.invoice_no} completed`);
+      toast.success(`Sale ${res.invoice_no} completed${isDesktop() ? " locally" : ""}`);
       setCart([]); setCustomer(""); setDiscount(0); setTendered("");
       qc.invalidateQueries();
-      await reprint(res.id);
+      if (isDesktop() && (res as any).sale_items) printPosReceipt({ ...res, tendered }); else await reprint(res.id);
+      if (isDesktop()) void syncPendingPosSales();
     },
     onError: (e: Error) => toast.error(e.message),
     onSettled: () => { submitting.current = false; },
   });
 
   const reprint = async (id: string) => {
+    if (isDesktop()) { const local=await getDesktopReceipt(id); if(local){printPosReceipt(local);return;} }
     const { data, error } = await supabase.from("sales").select("*, sale_items(quantity,unit_price,line_total,products(name,unit))").eq("id", id).single();
     if (error || !data) return toast.error("Could not load receipt");
     let cashier = "-";
