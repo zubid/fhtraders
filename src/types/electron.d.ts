@@ -1,0 +1,1 @@
+export {};declare global{interface Window{fhDesktop?:{isDesktop:true;getState:()=>Promise<{platform:string;version:string;dataDirectory:string;isPackaged:boolean}>;getStoragePath:()=>Promise<string>}}}
