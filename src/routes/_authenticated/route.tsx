@@ -9,6 +9,7 @@ import { syncPendingPosSales } from "@/lib/desktop-pos";
 import { DesktopSyncStatus } from "@/components/app/DesktopSyncStatus";
 import { syncPendingPurchases } from "@/lib/desktop-purchases";
 import { syncPendingNormalSales } from "@/lib/desktop-sales";
+import { syncPendingPayments } from "@/lib/desktop-payments";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -34,12 +35,12 @@ function AuthenticatedLayout() {
   useEffect(() => {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
     // Initial/reference refresh is best-effort. A network failure must never block the desktop UI.
-    Promise.all([syncPendingPosSales(), syncPendingPurchases(), syncPendingNormalSales()]).then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Sync/bootstrap deferred:", error));
+    Promise.all([syncPendingPosSales(), syncPendingPurchases(), syncPendingNormalSales(), syncPendingPayments()]).then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Sync/bootstrap deferred:", error));
   }, [loading, session]);
 
   useEffect(() => {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
-    const sync = () => void Promise.all([syncPendingPosSales(), syncPendingPurchases(), syncPendingNormalSales()]).then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Reconnect sync deferred:", error));
+    const sync = () => void Promise.all([syncPendingPosSales(), syncPendingPurchases(), syncPendingNormalSales(), syncPendingPayments()]).then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Reconnect sync deferred:", error));
     window.addEventListener("online", sync);
     return () => window.removeEventListener("online", sync);
   }, [loading, session]);

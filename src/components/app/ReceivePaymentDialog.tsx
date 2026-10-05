@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isDesktop } from "@/lib/desktop-pos";
+import { createDesktopRestaurantPayment, getDesktopPaymentData } from "@/lib/desktop-payments";
 import { recordPayment, saleBalance, PAYMENT_METHODS, METHOD_LABELS } from "@/lib/credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ export function ReceivePaymentDialog({
   presetSaleId?: string;
 }) {
   const qc = useQueryClient();
+  const desktop = isDesktop();
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<string>("cash");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -41,6 +44,7 @@ export function ReceivePaymentDialog({
     queryKey: ["unpaid-sales", restaurantId],
     enabled: open && !!restaurantId,
     queryFn: async () => {
+      if (desktop) return ((await getDesktopPaymentData())?.sales ?? []).filter((s:any)=>s.restaurant_id===restaurantId).map((s:any)=>({...s,payment_status:Number(s.amount_received)>=Number(s.grand_total)?"paid":Number(s.amount_received)>0?"partial":"unpaid"}));
       const { data, error } = await supabase
         .from("sales")
         .select("id, invoice_no, grand_total, amount_received, sale_date, payment_status")
@@ -53,7 +57,7 @@ export function ReceivePaymentDialog({
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
     enabled: open,
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopPaymentData())?.vaults ?? [] :
       ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
 
@@ -81,19 +85,11 @@ export function ReceivePaymentDialog({
   const save = useMutation({
     mutationFn: async () => {
       if (!vaultUserId) throw new Error("Received By Vault is required");
-      await recordPayment({
-        restaurantId,
-        amount,
-        method,
-        date,
-        note,
-        saleId: target === "fifo" ? undefined : target,
-        vaultUserId,
-      });
+      if (desktop) await createDesktopRestaurantPayment({restaurant_id:restaurantId,amount,method,payment_date:date,note,sale_id:target==="fifo"?null:target,vault_user_id:vaultUserId}); else await recordPayment({restaurantId,amount,method,date,note,saleId:target==="fifo"?undefined:target,vaultUserId});
     },
     onSuccess: () => {
       qc.invalidateQueries();
-      toast.success("Payment recorded");
+      toast.success(desktop ? "Payment saved locally · sync queued" : "Payment recorded");
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),

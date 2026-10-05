@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isDesktop } from "@/lib/desktop-pos";
+import { createDesktopSupplierPayment, getDesktopPaymentData } from "@/lib/desktop-payments";
 import { paySupplier, purchaseBalance, PAYMENT_METHODS, METHOD_LABELS } from "@/lib/supplier-credit";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,7 @@ export function PaySupplierDialog({
   onSuccess?: () => void;
 }) {
   const qc = useQueryClient();
+  const desktop = isDesktop();
   const [amount, setAmount] = useState<number>(0);
   const [method, setMethod] = useState<string>("cash");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -45,6 +48,7 @@ export function PaySupplierDialog({
     queryKey: ["unpaid-purchases", supplierId],
     enabled: open && !!supplierId,
     queryFn: async () => {
+      if (desktop) return ((await getDesktopPaymentData())?.purchases ?? []).filter((p:any)=>p.supplier_id===supplierId).map((p:any)=>({...p,payment_status:Number(p.amount_paid)>=Number(p.grand_total)?"paid":Number(p.amount_paid)>0?"partial":"unpaid"}));
       const { data, error } = await supabase
         .from("purchases")
         .select("id, reference_no, grand_total, amount_paid, purchase_date, payment_status")
@@ -57,7 +61,7 @@ export function PaySupplierDialog({
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
     enabled: open,
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopPaymentData())?.vaults ?? [] :
       ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
 
@@ -90,15 +94,7 @@ export function PaySupplierDialog({
     mutationFn: async () => {
       if (!vaultUserId) throw new Error("Paid From Vault is required");
       if (amount > maximum + 0.001) throw new Error("Payment amount cannot exceed the selected balance due");
-      await paySupplier({
-        supplierId,
-        amount,
-        method,
-        date,
-        note,
-        purchaseId: target === "fifo" ? undefined : target,
-        vaultUserId,
-      });
+      if (desktop) await createDesktopSupplierPayment({supplier_id:supplierId,amount,method,payment_date:date,note,purchase_id:target==="fifo"?null:target,vault_user_id:vaultUserId}); else await paySupplier({supplierId,amount,method,date,note,purchaseId:target==="fifo"?undefined:target,vaultUserId});
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["purchase-edit"] });
@@ -108,7 +104,7 @@ export function PaySupplierDialog({
       void qc.invalidateQueries({ queryKey: ["supplier"] });
       void qc.invalidateQueries({ queryKey: ["vault_users_active"] });
       void qc.invalidateQueries({ queryKey: ["vault"] });
-      toast.success("Payment recorded");
+      toast.success(desktop ? "Supplier payment saved locally · sync queued" : "Payment recorded");
       onOpenChange(false);
       onSuccess?.();
     },

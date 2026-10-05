@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { isDesktop } from "@/lib/desktop-pos";
+import { getDesktopPaymentData, getLocalRestaurantPayments } from "@/lib/desktop-payments";
 
 export const Route = createFileRoute("/_authenticated/payments")({
   component: PaymentsPage,
@@ -25,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
 
 function PaymentsPage() {
   const qc = useQueryClient();
+  const desktop = isDesktop();
   const { isAdmin } = useAuth();
   const [restaurantFilter, setRestaurantFilter] = useState("all");
   const [vaultFilter, setVaultFilter] = useState("all");
@@ -37,30 +40,30 @@ function PaymentsPage() {
 
   const { data: restaurants } = useQuery({
     queryKey: ["restaurants-min"],
-    queryFn: async () => (await supabase.from("restaurants").select("id,name").order("name")).data ?? [],
+    queryFn: async () => desktop ? (await getDesktopPaymentData())?.restaurants ?? [] : (await supabase.from("restaurants").select("id,name").order("name")).data ?? [],
   });
 
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault-users-min"],
-    queryFn: async () => ((await (supabase.from("vault_users" as any) as any).select("id,name").order("name")).data ?? []) as any[],
+    queryFn: async () => desktop ? (await getDesktopPaymentData())?.vaults ?? [] : ((await (supabase.from("vault_users" as any) as any).select("id,name").order("name")).data ?? []) as any[],
   });
 
   const { data: sales } = useQuery({
     queryKey: ["sales-balances"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopPaymentData())?.sales ?? [] :
       (await supabase.from("sales").select("id,restaurant_id,grand_total,amount_received")).data ?? [],
   });
 
   const { data: payments, isLoading } = useQuery({
     queryKey: ["payments"],
     queryFn: async () => {
+      const local = desktop ? await getLocalRestaurantPayments() : [];
+      if (desktop && !navigator.onLine) return local;
       const { data, error } = await supabase
-        .from("payments")
-        .select("*, restaurants(name), sales(invoice_no), vault_users(name)")
-        .order("payment_date", { ascending: false })
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
+        .from("payments").select("*, restaurants(name), sales(invoice_no), vault_users(name)")
+        .order("payment_date", { ascending: false }).order("created_at", { ascending: false });
+      if (error) { if (desktop) return local; throw error; }
+      return [...local.filter((p:any)=>p.sync_status!=="synced"), ...(data ?? [])] as any[];
     },
   });
 
@@ -195,13 +198,13 @@ function PaymentsPage() {
                           </Link>
                           ) : <span className="text-muted-foreground">POS / Walk-in</span>}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{p.sales?.invoice_no ?? "General (FIFO)"}</TableCell>
+                        <TableCell className="font-mono text-xs">{p.sales?.invoice_no ?? "General (FIFO)"}{(p as any).is_local && <Badge variant={(p as any).sync_status==="failed"?"destructive":"secondary"} className="ml-2">{(p as any).sync_status}</Badge>}</TableCell>
                         <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>
                         <TableCell className={p.vault_users?.name ? "" : "font-semibold text-destructive"}>{p.vault_users?.name ?? "Missing Vault"}</TableCell>
                         <TableCell className="max-w-48 truncate">{p.note ?? "-"}</TableCell>
                         <TableCell className="text-right font-medium text-success">{formatCurrency(p.amount)}</TableCell>
                         <TableCell className="text-right">
-                          {isAdmin && (
+                          {isAdmin && !(p as any).is_local && (
                             <>
                               <Button variant="ghost" size="icon" onClick={() => setToEdit(p)}><Pencil className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon" onClick={() => setToDelete(p)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
