@@ -141,7 +141,7 @@ function PurchasesPage() {
                         isAdmin &&
                         <Button variant="ghost" size="icon" title="Pay" onClick={() => setPayFor(p)}><HandCoins className="h-4 w-4" /></Button>
                       )}
-                      {isAdmin && !(p as any).is_local && <Button variant="ghost" size="icon" title="Return to supplier" onClick={() => setReturnFor(p)}><Undo2 className="h-4 w-4" /></Button>}
+                      {isAdmin && <Button variant="ghost" size="icon" title="Return to supplier" onClick={() => setReturnFor(p)}><Undo2 className="h-4 w-4" /></Button>}
                         <Button variant="ghost" size="icon" onClick={() => setView(p)}><Eye className="h-4 w-4" /></Button>
                       {isAdmin && !(p as any).is_local && (
                         <Button variant="ghost" size="icon" asChild title="Edit"><Link to="/purchases/edit/$id" params={{ id: p.id }}><Pencil className="h-4 w-4" /></Link></Button>
