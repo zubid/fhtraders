@@ -23,6 +23,8 @@ jobs:
         run: bun run build
       - name: Rebuild native Electron dependencies
         run: bunx electron-builder install-app-deps
+      - name: Run offline SQLite smoke test
+        run: node scripts/offline-smoke.cjs
       - name: Build Windows installer
         run: bunx electron-builder --win --publish never
       - name: Upload Windows installer
