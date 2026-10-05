@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { isDesktop } from "@/lib/desktop-pos";
+import { createDesktopExpense, getDesktopExpenseVaultData, getLocalExpenses } from "@/lib/desktop-expenses-vault";
 
 export const Route = createFileRoute("/_authenticated/expenses")({
   component: ExpensesPage,
@@ -28,6 +30,7 @@ const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 function ExpensesPage() {
   const qc = useQueryClient();
+  const desktop = isDesktop();
   const [from, setFrom] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [to, setTo] = useState(today());
   const [genOpen, setGenOpen] = useState(false);
@@ -44,24 +47,25 @@ function ExpensesPage() {
 
   const { data: cats } = useQuery({
     queryKey: ["expense_categories"],
-    queryFn: async () => (await supabase.from("expense_categories").select("*").order("name")).data ?? [],
+    queryFn: async () => desktop ? (await getDesktopExpenseVaultData())?.categories ?? [] : (await supabase.from("expense_categories").select("*").order("name")).data ?? [],
   });
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? ((await getDesktopExpenseVaultData())?.vaults ?? []).filter((v:any)=>v.vault_type==="business_cash") :
       ((await (supabase.from("vault_users" as any) as any).select("id,name").eq("is_active", true).eq("vault_type", "business_cash").order("name")).data ?? []) as any[],
   });
   const { data: employees } = useQuery({
     queryKey: ["employees-active"],
-    queryFn: async () => (await supabase.from("employees").select("id,name,monthly_salary").eq("is_active", true).order("name")).data ?? [],
+    queryFn: async () => desktop ? (await getDesktopExpenseVaultData())?.employees ?? [] : (await supabase.from("employees").select("id,name,monthly_salary").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: expenses, isLoading } = useQuery({
     queryKey: ["expenses"],
-    queryFn: async () =>
-      (await supabase
-        .from("expenses")
-        .select("*, expense_categories(name,accounting_class), employees(name), vault_users(name)")
-        .order("expense_date", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const local=desktop?await getLocalExpenses():[];
+      if(desktop&&!navigator.onLine)return local;
+      const {data,error}=await supabase.from("expenses").select("*, expense_categories(name,accounting_class), employees(name), vault_users(name)").order("expense_date",{ascending:false});
+      if(error){if(desktop)return local;throw error}return [...local.filter((x:any)=>x.sync_status!=="synced"),...(data??[])] as any[];
+    },
   });
 
   const inRange = (e: any) => e.expense_date >= from && e.expense_date <= to;
@@ -78,15 +82,9 @@ function ExpensesPage() {
     mutationFn: async () => {
       if (Number(gen.amount) <= 0) throw new Error("Enter an amount");
       if (!gen.vault_user_id) throw new Error("Paid By Vault is required");
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("expenses").insert({
-        type: "general", expense_date: gen.expense_date, category_id: gen.category_id || null,
-        amount: Number(gen.amount), description: gen.description || null, created_by: u.user?.id ?? null,
-        vault_user_id: gen.vault_user_id,
-      });
-      if (error) throw error;
+      if(desktop) await createDesktopExpense({type:"general",expense_date:gen.expense_date,category_id:gen.category_id||null,amount:Number(gen.amount),description:gen.description||null,vault_user_id:gen.vault_user_id}); else {const { data: u } = await supabase.auth.getUser();const { error } = await supabase.from("expenses").insert({type:"general",expense_date:gen.expense_date,category_id:gen.category_id||null,amount:Number(gen.amount),description:gen.description||null,created_by:u.user?.id??null,vault_user_id:gen.vault_user_id});if(error)throw error;}
     },
-    onSuccess: () => { qc.invalidateQueries(); setGenOpen(false); toast.success("Expense added"); },
+    onSuccess: () => { qc.invalidateQueries(); setGenOpen(false); toast.success(desktop?"Expense saved locally · sync queued":"Expense added"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -95,16 +93,9 @@ function ExpensesPage() {
       if (!sal.employee_id) throw new Error("Select an employee");
       if (Number(sal.amount) <= 0) throw new Error("Enter an amount");
       if (!sal.vault_user_id) throw new Error("Paid By Vault is required");
-      const { data: u } = await supabase.auth.getUser();
-      const { error } = await supabase.from("expenses").insert({
-        type: "salary", expense_date: sal.expense_date, employee_id: sal.employee_id,
-        salary_month: sal.salary_month, amount: Number(sal.amount), description: sal.description || null,
-        created_by: u.user?.id ?? null,
-        vault_user_id: sal.vault_user_id,
-      });
-      if (error) throw error;
+      if(desktop) await createDesktopExpense({type:"salary",expense_date:sal.expense_date,employee_id:sal.employee_id,salary_month:sal.salary_month,amount:Number(sal.amount),description:sal.description||null,vault_user_id:sal.vault_user_id}); else {const {data:u}=await supabase.auth.getUser();const {error}=await supabase.from("expenses").insert({type:"salary",expense_date:sal.expense_date,employee_id:sal.employee_id,salary_month:sal.salary_month,amount:Number(sal.amount),description:sal.description||null,created_by:u.user?.id??null,vault_user_id:sal.vault_user_id});if(error)throw error;}
     },
-    onSuccess: () => { qc.invalidateQueries(); setSalOpen(false); toast.success("Salary recorded"); },
+    onSuccess: () => { qc.invalidateQueries(); setSalOpen(false); toast.success(desktop?"Salary saved locally · sync queued":"Salary recorded"); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -223,7 +214,7 @@ function ExpensesPage() {
                       <TableCell>{e.description ?? "-"}</TableCell>
                       <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      <TableCell className="text-right">{!(e as any).is_local&&<Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}{(e as any).is_local&&<Badge variant={(e as any).sync_status==="failed"?"destructive":"secondary"}>{(e as any).sync_status}</Badge>}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -249,7 +240,7 @@ function ExpensesPage() {
                       <TableCell>{e.description ?? "-"}</TableCell>
                       <TableCell>{e.vault_users?.name ?? "-"}</TableCell>
                       <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                      <TableCell className="text-right">{!(e as any).is_local&&<Button variant="ghost" size="icon" onClick={() => setToDelete(e)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}{(e as any).is_local&&<Badge variant={(e as any).sync_status==="failed"?"destructive":"secondary"}>{(e as any).sync_status}</Badge>}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
