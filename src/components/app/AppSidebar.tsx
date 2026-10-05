@@ -16,7 +16,7 @@ import {
   Settings,
   Truck,
   Vault,
-  MonitorSmartphone, ScrollText,
+  MonitorSmartphone, ScrollText, CloudCog,
 } from "lucide-react";
 import {
   Sidebar,
@@ -55,6 +55,7 @@ const catalogItems = [
 const adminItems = [
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Activity Log", url: "/activity", icon: ScrollText },
+  { title: "Sync Center", url: "/sync", icon: CloudCog },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
