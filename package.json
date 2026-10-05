@@ -129,5 +129,8 @@
       ".output/**/*"
     ],
     "npmRebuild": true
-  }
+  },
+  "version": "1.0.0",
+  "description": "FH Traders offline-first desktop and web management system",
+  "author": "FH Traders"
 }

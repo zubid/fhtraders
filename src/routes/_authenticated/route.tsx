@@ -6,13 +6,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import { bootstrapDesktopReferenceData } from "@/lib/desktop-bootstrap";
 import { syncPendingPosSales } from "@/lib/desktop-pos";
+import { DesktopSyncStatus } from "@/components/app/DesktopSyncStatus";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   component: AuthenticatedLayout,
 });
 
-const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault", "/activity"];
+const ADMIN_ONLY = ["/dashboard", "/reports", "/settings", "/payments", "/expenses", "/employees", "/vault", "/activity", "/sync"];
 
 function AuthenticatedLayout() {
   const { session, loading, role, isAdmin } = useAuth();
@@ -55,6 +56,7 @@ function AuthenticatedLayout() {
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
           <SidebarTrigger />
+          <DesktopSyncStatus />
         </header>
         <main className="flex-1 p-4 sm:p-6">
           <Outlet />
