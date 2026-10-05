@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { createDesktopNormalSale, getDesktopNormalSaleData } from "@/lib/desktop-sales";
+import { isDesktop } from "@/lib/desktop-pos";
 
 export const Route = createFileRoute("/_authenticated/sales_/new")({
   component: NewSale,
@@ -38,19 +40,20 @@ function NewSale() {
   const defaultDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const isDirty = !!restaurantId || lines.length > 0 || discountValue !== 0 || tax !== 0 || !!notes.trim() || received !== 0 || date !== defaultDate;
   const { allowNavigation } = useUnsavedChangesGuard(isDirty);
+  const desktop = isDesktop();
 
   const { data: restaurants } = useQuery({
     queryKey: ["restaurants-active"],
-    queryFn: async () => (await supabase.from("restaurants").select("id,name").eq("is_active", true).order("name")).data ?? [],
+    queryFn: async () => desktop ? (await getDesktopNormalSaleData())?.restaurants ?? [] : (await supabase.from("restaurants").select("id,name").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: products } = useQuery({
     queryKey: ["products-sale"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopNormalSaleData())?.products ?? [] :
       (await supabase.from("products").select("id,name,unit,sku,current_stock,avg_cost,categories(name)").order("name")).data ?? [],
   });
   const { data: vaultUsers } = useQuery({
     queryKey: ["vault_users_active"],
-    queryFn: async () =>
+    queryFn: async () => desktop ? (await getDesktopNormalSaleData())?.vaults ?? [] :
       ((await (supabase.from("vault_users" as any) as any)
         .select("id,name")
         .eq("is_active", true)
@@ -112,6 +115,16 @@ function NewSale() {
       if (received > grandTotal) throw new Error("Initial Payment cannot exceed the Grand Total.");
       if (received > 0 && !paymentMethod) throw new Error("Select a Payment Method.");
       if (received > 0 && !receiptVaultId) throw new Error("Select the Business Cash Vault that received this payment.");
+      if (desktop) {
+        const sale = await createDesktopNormalSale({
+          restaurant_id: restaurantId, sale_date: date,
+          items: lines.map((l) => ({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price })),
+          discount, tax, notes: notes || null, received,
+          payment_method: received > 0 ? paymentMethod : null,
+          vault_user_id: received > 0 ? receiptVaultId : null,
+        });
+        return { paymentWarning: false, offlineLocal: sale.sync_status !== "synced" };
+      }
       const { data: sale, error: sErr } = await supabase
         .from("sales")
         .insert({ restaurant_id: restaurantId, sale_date: date, subtotal, discount, tax, grand_total: grandTotal, amount_received: 0, notes: notes || null })
@@ -139,17 +152,17 @@ function NewSale() {
             vaultUserId: receiptVaultId,
           });
         } catch {
-          return { paymentWarning: true };
+          return { paymentWarning: true, offlineLocal: false };
         }
       }
-      return { paymentWarning: false };
+      return { paymentWarning: false, offlineLocal: false };
     },
-    onSuccess: ({ paymentWarning }) => {
+    onSuccess: ({ paymentWarning, offlineLocal }: any) => {
       qc.invalidateQueries();
       if (paymentWarning) {
         toast.error("Sale was saved, but the initial payment could not be recorded. The Sale remains outstanding. Record the payment from Restaurant Payments.", { duration: 12000 });
       } else {
-        toast.success("Sale saved · stock deducted");
+        toast.success(offlineLocal ? "Sale saved locally · stock deducted · sync queued" : "Sale saved · stock deducted");
       }
       allowNavigation();
       navigate({ to: "/sales" });
