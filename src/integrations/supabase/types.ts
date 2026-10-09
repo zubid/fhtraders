@@ -1279,6 +1279,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _pos_guard: {
+        Args: { p_password: string; p_reason: string }
+        Returns: undefined
+      }
+      _pos_recalc: {
+        Args: { p_discount: number; p_sale_id: string }
+        Returns: number
+      }
       claim_sync_operation: {
         Args: {
           p_device_id: string
@@ -1326,6 +1334,27 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      pos_edit_sale: {
+        Args: {
+          p_customer_name: string
+          p_discount: number
+          p_items: Json
+          p_password: string
+          p_reason: string
+          p_sale_id: string
+        }
+        Returns: Json
+      }
+      pos_item_less: {
+        Args: {
+          p_password: string
+          p_product_id: string
+          p_quantity: number
+          p_reason: string
+          p_sale_id: string
+        }
+        Returns: Json
       }
       record_sale_return: {
         Args: {
@@ -1398,6 +1427,10 @@ export type Database = {
           p_name: string
         }
         Returns: string
+      }
+      set_pos_authorization_password: {
+        Args: { p_password: string }
+        Returns: undefined
       }
       sync_expense: {
         Args: {
@@ -1546,6 +1579,14 @@ export type Database = {
       vault_available_balance: {
         Args: { p_vault_user_id: string }
         Returns: number
+      }
+      verify_pos_authorization: {
+        Args: { p_password: string }
+        Returns: boolean
+      }
+      void_pos_sale: {
+        Args: { p_password: string; p_reason: string; p_sale_id: string }
+        Returns: Json
       }
       void_vault_cash_movement: {
         Args: { p_movement_id: string; p_reason: string }
