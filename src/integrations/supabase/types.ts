@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          new_data: Json | null
+          old_data: Json | null
+          reference: string | null
+          summary: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json
+          new_data?: Json | null
+          old_data?: Json | null
+          reference?: string | null
+          summary: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          new_data?: Json | null
+          old_data?: Json | null
+          reference?: string | null
+          summary?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           address: string | null
@@ -28,6 +70,7 @@ export type Database = {
           invoice_footer: string
           logo_url: string | null
           phone: string | null
+          pos_authorization_hash: string | null
           updated_at: string
         }
         Insert: {
@@ -43,6 +86,7 @@ export type Database = {
           invoice_footer?: string
           logo_url?: string | null
           phone?: string | null
+          pos_authorization_hash?: string | null
           updated_at?: string
         }
         Update: {
@@ -58,6 +102,7 @@ export type Database = {
           invoice_footer?: string
           logo_url?: string | null
           phone?: string | null
+          pos_authorization_hash?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -212,6 +257,77 @@ export type Database = {
           },
           {
             foreignKeyName: "expenses_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_adjustments: {
+        Row: {
+          adjustment_type: string
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          product_id: string | null
+          purchase_id: string | null
+          quantity: number
+          reason: string
+          sale_id: string | null
+          vault_user_id: string | null
+        }
+        Insert: {
+          adjustment_type: string
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string | null
+          purchase_id?: string | null
+          quantity: number
+          reason: string
+          sale_id?: string | null
+          vault_user_id?: string | null
+        }
+        Update: {
+          adjustment_type?: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string | null
+          purchase_id?: string | null
+          quantity?: number
+          reason?: string
+          sale_id?: string | null
+          vault_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_adjustments_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_adjustments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_adjustments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_adjustments_vault_user_id_fkey"
             columns: ["vault_user_id"]
             isOneToOne: false
             referencedRelation: "vault_users"
@@ -559,6 +675,7 @@ export type Database = {
           grand_total: number
           id: string
           invoice_no: string
+          is_voided: boolean
           notes: string | null
           payment_method: string | null
           payment_status: string
@@ -568,6 +685,9 @@ export type Database = {
           subtotal: number
           tax: number
           total_cost: number
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           amount_received?: number
@@ -578,6 +698,7 @@ export type Database = {
           grand_total?: number
           id?: string
           invoice_no?: string
+          is_voided?: boolean
           notes?: string | null
           payment_method?: string | null
           payment_status?: string
@@ -587,6 +708,9 @@ export type Database = {
           subtotal?: number
           tax?: number
           total_cost?: number
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           amount_received?: number
@@ -597,6 +721,7 @@ export type Database = {
           grand_total?: number
           id?: string
           invoice_no?: string
+          is_voided?: boolean
           notes?: string | null
           payment_method?: string | null
           payment_status?: string
@@ -606,6 +731,9 @@ export type Database = {
           subtotal?: number
           tax?: number
           total_cost?: number
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
           {
@@ -817,6 +945,119 @@ export type Database = {
         }
         Relationships: []
       }
+      sync_changes: {
+        Row: {
+          changed_at: string
+          entity_id: string
+          entity_type: string
+          operation: string
+          seq: number
+        }
+        Insert: {
+          changed_at?: string
+          entity_id: string
+          entity_type: string
+          operation: string
+          seq?: never
+        }
+        Update: {
+          changed_at?: string
+          entity_id?: string
+          entity_type?: string
+          operation?: string
+          seq?: never
+        }
+        Relationships: []
+      }
+      sync_devices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          device_key: string
+          id: string
+          is_active: boolean
+          last_seen_at: string | null
+          location_label: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          device_key?: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string | null
+          location_label?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          device_key?: string
+          id?: string
+          is_active?: boolean
+          last_seen_at?: string | null
+          location_label?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sync_operations: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          created_by: string | null
+          device_id: string | null
+          entity_id: string | null
+          entity_type: string
+          error_message: string | null
+          id: string
+          operation_id: string
+          operation_type: string
+          payload: Json
+          status: string
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          device_id?: string | null
+          entity_id?: string | null
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          operation_id: string
+          operation_type: string
+          payload?: Json
+          status?: string
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          device_id?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          operation_id?: string
+          operation_type?: string
+          payload?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_operations_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "sync_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -834,6 +1075,64 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vault_adjustments: {
+        Row: {
+          adjustment_type: string
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          purchase_id: string | null
+          reason: string
+          sale_id: string | null
+          vault_user_id: string
+        }
+        Insert: {
+          adjustment_type: string
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id?: string | null
+          reason: string
+          sale_id?: string | null
+          vault_user_id: string
+        }
+        Update: {
+          adjustment_type?: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          purchase_id?: string | null
+          reason?: string
+          sale_id?: string | null
+          vault_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_adjustments_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_adjustments_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vault_adjustments_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vault_cash_movements: {
         Row: {
@@ -980,6 +1279,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_sync_operation: {
+        Args: {
+          p_device_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_operation_id: string
+          p_operation_type: string
+          p_payload?: Json
+        }
+        Returns: boolean
+      }
       correct_supplier_payment_vault: {
         Args: {
           p_new_vault_user_id: string
@@ -999,6 +1309,10 @@ export type Database = {
         }
         Returns: Json
       }
+      finish_sync_operation: {
+        Args: { p_error?: string; p_operation_id: string; p_success: boolean }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1013,6 +1327,16 @@ export type Database = {
           name: string
         }[]
       }
+      record_sale_return: {
+        Args: {
+          p_product_id: string
+          p_quantity: number
+          p_reason: string
+          p_sale_id: string
+          p_vault_user_id?: string
+        }
+        Returns: undefined
+      }
       record_supplier_payment: {
         Args: {
           p_amount: number
@@ -1024,6 +1348,17 @@ export type Database = {
           p_vault_user_id?: string
         }
         Returns: Json
+      }
+      record_supplier_return: {
+        Args: {
+          p_cash_refund?: number
+          p_product_id: string
+          p_purchase_id: string
+          p_quantity: number
+          p_reason: string
+          p_vault_user_id?: string
+        }
+        Returns: undefined
       }
       record_vault_cash_movement: {
         Args: {
@@ -1055,6 +1390,158 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      register_sync_device: {
+        Args: {
+          p_device_key: string
+          p_location_label?: string
+          p_name: string
+        }
+        Returns: string
+      }
+      sync_expense: {
+        Args: {
+          p_amount: number
+          p_category_id: string
+          p_description: string
+          p_device_id: string
+          p_employee_id: string
+          p_expense_date: string
+          p_local_expense_id: string
+          p_operation_id: string
+          p_salary_month: string
+          p_type: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
+      sync_normal_sale: {
+        Args: {
+          p_device_id: string
+          p_discount: number
+          p_items: Json
+          p_local_sale_id: string
+          p_notes: string
+          p_operation_id: string
+          p_payment_method?: string
+          p_received?: number
+          p_restaurant_id: string
+          p_sale_date: string
+          p_tax: number
+          p_vault_user_id?: string
+        }
+        Returns: Json
+      }
+      sync_pos_sale: {
+        Args: {
+          p_customer_name: string
+          p_device_id: string
+          p_discount: number
+          p_items: Json
+          p_local_sale_id: string
+          p_method: string
+          p_note: string
+          p_operation_id: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
+      sync_purchase: {
+        Args: {
+          p_device_id: string
+          p_items: Json
+          p_local_purchase_id: string
+          p_new_supplier_name: string
+          p_notes: string
+          p_operation_id: string
+          p_payments?: Json
+          p_purchase_date: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
+      sync_restaurant_payment: {
+        Args: {
+          p_amount: number
+          p_device_id: string
+          p_local_payment_id: string
+          p_method: string
+          p_note: string
+          p_operation_id: string
+          p_payment_date: string
+          p_preferred_sale_id: string
+          p_restaurant_id: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
+      sync_sale_return: {
+        Args: {
+          p_device_id: string
+          p_local_return_id: string
+          p_operation_id: string
+          p_product_id: string
+          p_quantity: number
+          p_reason: string
+          p_sale_id: string
+          p_vault_user_id?: string
+        }
+        Returns: Json
+      }
+      sync_supplier_payment: {
+        Args: {
+          p_amount: number
+          p_device_id: string
+          p_local_payment_id: string
+          p_method: string
+          p_note: string
+          p_operation_id: string
+          p_payment_date: string
+          p_preferred_purchase_id: string
+          p_supplier_id: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
+      sync_supplier_return: {
+        Args: {
+          p_cash_refund?: number
+          p_device_id: string
+          p_local_return_id: string
+          p_operation_id: string
+          p_product_id: string
+          p_purchase_id: string
+          p_quantity: number
+          p_reason: string
+          p_vault_user_id?: string
+        }
+        Returns: Json
+      }
+      sync_vault_cash_movement: {
+        Args: {
+          p_amount: number
+          p_destination_vault_user_id: string
+          p_device_id: string
+          p_local_movement_id: string
+          p_movement_date: string
+          p_movement_type: string
+          p_note: string
+          p_operation_id: string
+          p_source_vault_user_id: string
+        }
+        Returns: Json
+      }
+      sync_vault_topup: {
+        Args: {
+          p_amount: number
+          p_device_id: string
+          p_local_topup_id: string
+          p_note: string
+          p_operation_id: string
+          p_topup_date: string
+          p_vault_user_id: string
+        }
+        Returns: Json
       }
       vault_available_balance: {
         Args: { p_vault_user_id: string }
