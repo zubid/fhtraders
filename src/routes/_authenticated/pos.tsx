@@ -237,12 +237,12 @@ function PosPage() {
 }
 
 function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
-  const [adjust,setAdjust]=useState<{sale:any;mode:"item_less"|"delete"}|null>(null);
+  const [adjust,setAdjust]=useState<{sale:any;mode:"item_less"|"delete"|"edit"}|null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ["pos-history"],
     queryFn: async () => {
       const { data, error } = await (supabase.from("sales") as any)
-        .select("id,invoice_no,created_at,customer_name,grand_total,payment_method,created_by,is_voided,void_reason,source,restaurant_id,sale_items(id,product_id,quantity,unit_price,line_total,products(name,unit))")
+        .select("id,invoice_no,created_at,customer_name,grand_total,discount,payment_method,created_by,is_voided,void_reason,source,restaurant_id,sale_items(id,product_id,quantity,unit_price,line_total,products(name,unit))")
         .order("created_at", { ascending: false }).limit(250);
       // Some Lovable-managed databases contain POS rows created before source tagging
       // was applied consistently. A POS sale is either explicitly tagged, or is a
@@ -270,7 +270,7 @@ function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
               <TableCell><Badge variant="secondary">{METHOD_LABELS[s.payment_method] ?? s.payment_method}</Badge></TableCell>
               <TableCell>{s.cashier}</TableCell>
               <TableCell className="text-right font-medium">{s.is_voided?<Badge variant="destructive">Deleted</Badge>:formatCurrency(s.grand_total)}</TableCell>
-              <TableCell className="text-right"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" onClick={() => onPrint(s.id)} disabled={s.is_voided}><Printer className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Edit / Item Less" onClick={()=>setAdjust({sale:s,mode:"item_less"})} disabled={s.is_voided}><Pencil className="h-4 w-4"/></Button><Button variant="ghost" size="icon" title="Delete POS Sale" onClick={()=>setAdjust({sale:s,mode:"delete"})} disabled={s.is_voided}><ShieldX className="h-4 w-4 text-destructive"/></Button></div></TableCell>
+              <TableCell className="text-right"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" onClick={() => onPrint(s.id)} disabled={s.is_voided}><Printer className="h-4 w-4" /></Button><Button variant="ghost" size="icon" title="Edit Invoice" onClick={()=>setAdjust({sale:s,mode:"edit"})} disabled={s.is_voided}><Pencil className="h-4 w-4"/></Button><Button variant="ghost" size="icon" title="Item Less" onClick={()=>setAdjust({sale:s,mode:"item_less"})} disabled={s.is_voided}><Minus className="h-4 w-4"/></Button><Button variant="ghost" size="icon" title="Delete POS Sale" onClick={()=>setAdjust({sale:s,mode:"delete"})} disabled={s.is_voided}><ShieldX className="h-4 w-4 text-destructive"/></Button></div></TableCell>
             </TableRow>
           ))}</TableBody>
         </Table></div>
