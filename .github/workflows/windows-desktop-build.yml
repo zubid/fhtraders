@@ -20,7 +20,23 @@ jobs:
       - name: Install dependencies
         run: bun install
       - name: Build web bundle
-        run: bun run build
+        shell: pwsh
+        run: |
+          $env:NITRO_PRESET = 'node-server'
+          bun run build
+          $manifest = Get-Content '.output/nitro.json' -Raw | ConvertFrom-Json
+          if ($manifest.preset -ne 'node-server') { throw "Desktop requires node-server preset, got $($manifest.preset)" }
+          $env:PORT = '32146'
+          $env:HOST = '127.0.0.1'
+          $server = Start-Process -FilePath 'node' -ArgumentList '.output/server/index.mjs' -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/server-out.log" -RedirectStandardError "$env:RUNNER_TEMP/server-err.log"
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 40; $i++) {
+              if ($server.HasExited) { break }
+              try { $response = Invoke-WebRequest 'http://127.0.0.1:32146/' -UseBasicParsing -TimeoutSec 2; $ready = $true; break } catch { Start-Sleep -Milliseconds 500 }
+            }
+            if (-not $ready) { Get-Content "$env:RUNNER_TEMP/server-err.log" -ErrorAction SilentlyContinue; throw 'Bundled Node server failed localhost startup test' }
+          } finally { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
       - name: Rebuild native Electron dependencies
         run: bunx electron-builder install-app-deps
       - name: Run offline SQLite smoke test
