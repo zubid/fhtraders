@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, History, Download, Coins } from "lucide-react";
+import { AlertTriangle, History, Download, Coins, ShoppingCart, Receipt, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StockBadge } from "@/components/app/StockBadge";
@@ -164,11 +165,68 @@ function LedgerDialog({ product, onClose }: { product: any; onClose: () => void 
 
   const refs=(movements??[]).filter((m:any)=>m.reference_id).map((m:any)=>m.reference_id);
   const {data: purchaseLines}=useQuery({queryKey:["ledger-purchase-prices",product?.id,refs.join(",")],enabled:!!product&&refs.length>0,queryFn:async()=>((await supabase.from("purchase_items").select("purchase_id,unit_price,line_total,purchases(reference_no,purchase_date,suppliers(name))").eq("product_id",product.id).in("purchase_id",refs)).data??[]) as any[]});
+  const { data: recentPurchases = [], isLoading: pricesLoading, error: pricesError } = useQuery({
+    queryKey: ["ledger-price-history", product?.id],
+    enabled: !!product,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("purchase_items")
+        .select("id,purchase_id,quantity,unit_price,line_total,purchases(reference_no,purchase_date,created_at,suppliers(name))")
+        .eq("product_id", product.id).order("created_at", { ascending: false }).limit(500);
+      if (error) throw error;
+      return (data ?? []).sort((a: any, b: any) =>
+        String(b.purchases?.purchase_date ?? "").localeCompare(String(a.purchases?.purchase_date ?? "")) ||
+        String(b.purchases?.created_at ?? "").localeCompare(String(a.purchases?.created_at ?? "")));
+    },
+  });
+  const priceRows = recentPurchases.filter((p: any) => Number.isFinite(Number(p.unit_price)));
+  const priceValues = priceRows.map((p: any) => Number(p.unit_price));
+  const lowest = priceValues.length ? Math.min(...priceValues) : null;
+  const highest = priceValues.length ? Math.max(...priceValues) : null;
+  const chartData = [...priceRows].reverse().map((p: any) => ({
+    date: p.purchases?.purchase_date ?? "",
+    price: Number(p.unit_price),
+    reference: p.purchases?.reference_no ?? "",
+  }));
+  const saleRefs = (movements ?? []).filter((m: any) =>
+    m.reference_id && ["sale", "sale_reversal"].includes(m.reference_type)).map((m: any) => m.reference_id);
+  const { data: saleRefsData = [] } = useQuery({
+    queryKey: ["ledger-sale-references", product?.id, saleRefs.join(",")],
+    enabled: !!product && saleRefs.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("sales")
+        .select("id,invoice_no").in("id", [...new Set(saleRefs)]);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const saleMap = new Map(saleRefsData.map((x: any) => [x.id, x.invoice_no]));
   const purchaseMap=new Map((purchaseLines??[]).map((x:any)=>[x.purchase_id,x]));
   return (
     <Dialog open={!!product} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>Stock Ledger · {product?.name}</DialogTitle></DialogHeader>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" asChild><Link to="/purchases/new" onClick={onClose}><ShoppingCart className="mr-2 h-4 w-4" />New Purchase</Link></Button>
+          <Button size="sm" variant="outline" asChild><Link to="/sales/new" onClick={onClose}><Receipt className="mr-2 h-4 w-4" />New Sale</Link></Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Last Purchase Price</p><p className="text-lg font-semibold">{priceRows.length ? formatCurrency(priceRows[0].unit_price) : "—"}</p><p className="text-xs text-muted-foreground">{priceRows[0]?.purchases?.purchase_date ?? "No purchase history"}</p></CardContent></Card>
+          <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Lowest Purchase Price</p><p className="text-lg font-semibold">{lowest === null ? "—" : formatCurrency(lowest)}</p></CardContent></Card>
+          <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Highest Purchase Price</p><p className="text-lg font-semibold">{highest === null ? "—" : formatCurrency(highest)}</p></CardContent></Card>
+        </div>
+        <div className="rounded-lg border p-3">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4" />Purchase Price History (PKR per {product?.unit ?? "unit"})</h3>
+          {pricesLoading ? <Skeleton className="h-44 w-full" /> : pricesError ? <p className="text-sm text-destructive">Could not load purchase prices.</p> : chartData.length === 0 ? <p className="text-sm text-muted-foreground">No recorded purchases for this product.</p> :
+            <ResponsiveContainer width="100%" height={180}><LineChart data={chartData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 10 }} minTickGap={20} /><YAxis tick={{ fontSize: 11 }} width={65} domain={["auto", "auto"]} /><Tooltip formatter={(v: any) => formatCurrency(Number(v))} labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.reference ?? ""} /><Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={chartData.length < 40} /></LineChart></ResponsiveContainer>}
+          <p className="mt-2 text-xs text-muted-foreground">Prices reflect recorded purchase lines; high/low are based on the latest 500 entries, not stock valuation.</p>
+        </div>
+        <div className="rounded-lg border p-3">
+          <h3 className="mb-2 text-sm font-semibold">Recent Purchases</h3>
+          <div className="max-h-44 overflow-y-auto"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Invoice</TableHead><TableHead>Supplier</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>
+            {priceRows.slice(0, 10).map((p: any) => <TableRow key={p.id}><TableCell>{p.purchases?.purchase_date ?? "—"}</TableCell><TableCell><Button variant="link" size="sm" className="h-auto p-0" asChild><Link to="/purchases/edit/$id" params={{ id: p.purchase_id }} onClick={onClose}>{p.purchases?.reference_no ?? "View Purchase"}</Link></Button></TableCell><TableCell>{p.purchases?.suppliers?.name ?? "—"}</TableCell><TableCell className="text-right">{formatNumber(p.quantity)}</TableCell><TableCell className="text-right">{formatCurrency(p.unit_price)}</TableCell><TableCell className="text-right">{formatCurrency(p.line_total)}</TableCell></TableRow>)}
+            {priceRows.length === 0 && <TableRow><TableCell colSpan={6} className="text-muted-foreground">No purchases recorded.</TableCell></TableRow>}
+          </TableBody></Table></div>
+        </div>
         {isLoading ? <Skeleton className="h-40 w-full" /> : (movements ?? []).length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">No movements yet.</p>
         ) : (
@@ -184,7 +242,12 @@ function LedgerDialog({ product, onClose }: { product: any; onClose: () => void 
                         {m.reference_type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs">{purchaseMap.get(m.reference_id)?.purchases?.reference_no??m.reference_type}<div className="text-muted-foreground">{purchaseMap.get(m.reference_id)?.purchases?.suppliers?.name??""}</div></TableCell>
+                    <TableCell className="text-xs">
+                      {purchaseMap.has(m.reference_id) ? <Link className="font-medium text-primary underline-offset-2 hover:underline" to="/purchases/edit/$id" params={{ id: m.reference_id }} onClick={onClose}>{purchaseMap.get(m.reference_id)?.purchases?.reference_no ?? "View Purchase"}</Link>
+                        : saleMap.has(m.reference_id) ? <Link className="font-medium text-primary underline-offset-2 hover:underline" to="/sales/edit/$id" params={{ id: m.reference_id }} onClick={onClose}>{saleMap.get(m.reference_id)}</Link>
+                        : m.reference_type}
+                      <div className="text-muted-foreground">{purchaseMap.get(m.reference_id)?.purchases?.suppliers?.name ?? ""}</div>
+                    </TableCell>
                     <TableCell className={`text-right ${m.movement_type === "in" ? "text-success" : "text-destructive"}`}>
                       {m.movement_type === "in" ? "+" : "-"}{formatNumber(m.quantity)}
                     </TableCell>
