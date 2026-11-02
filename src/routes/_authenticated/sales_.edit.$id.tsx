@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2, Search, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { getLastPurchasePrices } from "@/lib/last-purchase-prices";
+import { ReceivePaymentDialog } from "@/components/app/ReceivePaymentDialog";
+import { formatDate } from "@/lib/format";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { formatCurrency, formatNumber } from "@/lib/format";
@@ -34,6 +36,7 @@ function EditSale() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [term, setTerm] = useState("");
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const baseline = useRef("");
 
   const { data: restaurants } = useQuery({
@@ -58,6 +61,17 @@ function EditSale() {
         .eq("id", id).single();
       if (error) throw error;
       return data as any;
+    },
+  });
+
+  const { data: linkedPayments = [] } = useQuery({
+    queryKey: ["sale-linked-payments", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("payments")
+        .select("id,amount,method,payment_date,note,vault_users(name)")
+        .eq("sale_id", id).order("payment_date", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -107,6 +121,11 @@ function EditSale() {
     : Math.max(0, Number(discountValue) || 0);
   const grandTotal = Math.max(0, subtotal - discount + tax);
   const hasOverstock = lines.some((l) => l.quantity > l.stock);
+  const receivedAmount = Number(sale?.amount_received ?? 0);
+  const storedGrandTotal = Number(sale?.grand_total ?? 0);
+  const balanceDue = Math.max(0, storedGrandTotal - receivedAmount);
+  const isDirty = !!baseline.current && currentSnapshot !== baseline.current;
+  const overpaidByEdit = grandTotal + 0.005 < receivedAmount;
 
   const save = useMutation({
     mutationFn: async () => {
@@ -116,6 +135,8 @@ function EditSale() {
       if (lines.some((l) => l.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
       if (lines.some((l) => l.unit_price <= 0)) throw new Error("Selling price must be greater than zero for every item.");
       if (hasOverstock) throw new Error("One or more items exceed available stock.");
+      if (restaurantId !== sale?.restaurant_id && receivedAmount > 0) throw new Error("Cannot change restaurant after payments have been received.");
+      if (grandTotal + 0.005 < receivedAmount) throw new Error("Sale total cannot be less than amount already received. Reconcile payments first.");
       const { error: dErr } = await supabase.from("sale_items").delete().eq("sale_id", id);
       if (dErr) throw dErr;
       const { error: uErr } = await supabase.from("sales").update({
@@ -205,7 +226,7 @@ function EditSale() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Restaurant *</Label>
-              <Select value={restaurantId} onValueChange={setRestaurantId}>
+              <Select value={restaurantId} onValueChange={setRestaurantId} disabled={receivedAmount > 0}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{(restaurants ?? []).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
@@ -229,13 +250,56 @@ function EditSale() {
               <div className="flex justify-between"><span>Tax</span><span>{formatCurrency(tax)}</span></div>
               <div className="flex justify-between text-lg font-bold"><span>Grand Total</span><span>{formatCurrency(grandTotal)}</span></div>
             </div>
-            <p className="text-xs text-muted-foreground">Payments already received stay linked. Balance recalculates.</p>
-            <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || hasOverstock}>
+            {overpaidByEdit && <p className="text-sm text-destructive">New total is below the amount already received. Reconcile payments before saving.</p>}
+            <p className="text-xs text-muted-foreground">Existing payments remain in the ledger. Save invoice changes before receiving additional payments.</p>
+            <Button className="w-full" onClick={() => save.mutate()} disabled={save.isPending || hasOverstock || overpaidByEdit}>
               {save.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update Sale
             </Button>
           </CardContent>
         </Card>
       </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Payment Summary</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between"><span>Saved Sale Total</span><strong>{formatCurrency(storedGrandTotal)}</strong></div>
+            <div className="flex justify-between"><span>Already Received</span><strong>{formatCurrency(receivedAmount)}</strong></div>
+            <div className="flex justify-between border-t pt-3"><span>Balance Due</span><strong>{formatCurrency(balanceDue)}</strong></div>
+            {balanceDue <= 0 ? <p className="text-muted-foreground">Sale is fully paid.</p> :
+              <Button className="w-full" onClick={() => setPaymentOpen(true)} disabled={isDirty || save.isPending || !sale?.restaurant_id}>
+                Receive Additional Payment
+              </Button>}
+            {isDirty && balanceDue > 0 && <p className="text-xs text-muted-foreground">Save sale changes before receiving payment.</p>}
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base">Payment History</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Method</TableHead><TableHead>Received By</TableHead><TableHead>Note</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {linkedPayments.length === 0 ?
+                  <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No directly linked payment records.</TableCell></TableRow> :
+                  linkedPayments.map((payment: any) =>
+                    <TableRow key={payment.id}>
+                      <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                      <TableCell>{formatCurrency(Number(payment.amount))}</TableCell>
+                      <TableCell>{payment.method}</TableCell>
+                      <TableCell>{payment.vault_users?.name ?? "—"}</TableCell>
+                      <TableCell>{payment.note || "—"}</TableCell>
+                    </TableRow>)}
+              </TableBody>
+            </Table>
+            <p className="mt-2 text-xs text-muted-foreground">Restaurant payments allocated by FIFO may contribute to received totals without being directly linked to this invoice.</p>
+          </CardContent>
+        </Card>
+      </div>
+      {!!sale?.restaurant_id && (
+        <ReceivePaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen}
+          restaurantId={sale.restaurant_id}
+          restaurantName={(restaurants ?? []).find((r) => r.id === sale.restaurant_id)?.name}
+          presetSaleId={id} />
+      )}
     </div>
   );
 }
