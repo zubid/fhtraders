@@ -77,7 +77,7 @@ function EditSale() {
     setLines(loadedLines);
     baseline.current = JSON.stringify({ restaurantId: sale.restaurant_id ?? "", date: sale.sale_date,
       discountValue: Number(sale.discount) || 0, tax: Number(sale.tax) || 0, notes: sale.notes ?? "", lines: loadedLines });
-  }, [sale]);
+  }, [sale, lastPurchasePrices]);
 
   const results = !term.trim() ? [] : (products ?? [])
     .filter((p: any) => (p.name + " " + p.sku).toLowerCase().includes(term.toLowerCase()))
