@@ -275,7 +275,7 @@ function PosHistory({ onPrint }: { onPrint: (id: string) => void }) {
           ))}</TableBody>
         </Table></div>
       )}
-      {adjust&&<PosAdjustmentDialog open={!!adjust} onOpenChange={(v)=>!v&&setAdjust(null)} sale={adjust.sale} mode={adjust.mode}/>} 
+      {adjust&&<PosAdjustmentDialog key={`${adjust.sale.id}-${adjust.mode}`} open={!!adjust} onOpenChange={(v)=>!v&&setAdjust(null)} sale={adjust.sale} mode={adjust.mode}/>} 
     </Card>
   );
 }
