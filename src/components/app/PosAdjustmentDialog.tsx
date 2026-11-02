@@ -51,12 +51,11 @@ export function PosAdjustmentDialog({ open, onOpenChange, sale, mode }: { open: 
       if (mode === "delete" && !confirmDelete) throw new Error("Please tick the confirmation box to delete this sale.");
       if (mode === "edit" && (!items.length || items.some((i) => !(i.quantity > 0) || !(i.unit_price >= 0)))) throw new Error("Every line needs a quantity above 0 and a price of 0 or more.");
       if (mode === "item_less" && (!product || !(qty > 0))) throw new Error("Choose an item and a quantity above 0.");
-      const rpc = supabase.rpc as any;
       const { error } = mode === "edit"
-        ? await rpc("pos_edit_sale", { p_sale_id: sale.id, p_items: items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })), p_customer_name: customer, p_discount: discount, p_reason: reason.trim(), p_password: password })
+        ? await (supabase.rpc as any)("pos_edit_sale", { p_sale_id: sale.id, p_items: items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })), p_customer_name: customer, p_discount: discount, p_reason: reason.trim(), p_password: password })
         : mode === "delete"
-          ? await rpc("void_pos_sale", { p_sale_id: sale.id, p_reason: reason.trim(), p_password: password })
-          : await rpc("pos_item_less", { p_sale_id: sale.id, p_product_id: product, p_quantity: qty, p_reason: reason.trim(), p_password: password });
+          ? await (supabase.rpc as any)("void_pos_sale", { p_sale_id: sale.id, p_reason: reason.trim(), p_password: password })
+          : await (supabase.rpc as any)("pos_item_less", { p_sale_id: sale.id, p_product_id: product, p_quantity: qty, p_reason: reason.trim(), p_password: password });
       if (error) throw error;
     },
     onSuccess: () => {
