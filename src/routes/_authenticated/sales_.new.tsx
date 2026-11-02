@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Trash2, Loader2, Search, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { getLastPurchasePrices } from "@/lib/last-purchase-prices";
 import { METHOD_LABELS, PAYMENT_METHODS, recordPayment } from "@/lib/credit";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -46,6 +47,11 @@ function NewSale() {
     queryKey: ["restaurants-active"],
     queryFn: async () => desktop ? (await getDesktopNormalSaleData())?.restaurants ?? [] : (await supabase.from("restaurants").select("id,name").eq("is_active", true).order("name")).data ?? [],
   });
+  const { data: lastPurchasePrices = {} } = useQuery({
+    queryKey: ["last-purchase-prices"],
+    queryFn: getLastPurchasePrices,
+  });
+
   const { data: products } = useQuery({
     queryKey: ["products-sale"],
     queryFn: async () => desktop ? (await getDesktopNormalSaleData())?.products ?? [] :
@@ -81,7 +87,7 @@ function NewSale() {
 
   const addLine = (p: any) => {
     if (lines.some((l) => l.product_id === p.id)) { setTerm(""); return; }
-    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0, stock: Number(p.current_stock), cost: Number(p.avg_cost), price_mode: "amount", markup_percent: 0 }]);
+    setLines([...lines, { product_id: p.id, name: p.name, unit: p.unit, quantity: 1, unit_price: 0, stock: Number(p.current_stock), cost: Number(lastPurchasePrices[p.id] ?? p.avg_cost), price_mode: "amount", markup_percent: 0 }]);
     setTerm("");
   };
   const updateLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, idx) => {
@@ -100,7 +106,6 @@ function NewSale() {
     : Math.max(0, Number(discountValue) || 0);
   const grandTotal = Math.max(0, subtotal - discount + tax);
   const hasOverstock = lines.some((l) => l.quantity > l.stock);
-  const hasBelowCost = lines.some((l) => l.cost > 0 && l.unit_price < l.cost);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -110,7 +115,6 @@ function NewSale() {
       if (lines.some((l) => l.quantity <= 0)) throw new Error("Quantity must be greater than zero for every item.");
       if (lines.some((l) => l.unit_price <= 0)) throw new Error("Selling price must be greater than zero for every item.");
       if (hasOverstock) throw new Error("One or more items exceed available stock.");
-      if (hasBelowCost) throw new Error("Selling price cannot be lower than product cost.");
       if (received < 0) throw new Error("Initial Payment cannot be negative.");
       if (received > grandTotal) throw new Error("Initial Payment cannot exceed the Grand Total.");
       if (received > 0 && !paymentMethod) throw new Error("Select a Payment Method.");
@@ -201,7 +205,7 @@ function NewSale() {
                 <TableBody>
                   {lines.map((l, i) => {
                     const over = l.quantity > l.stock;
-                    const belowCost = l.cost > 0 && l.unit_price < l.cost;
+                    const belowCost = l.cost > 0 && l.unit_price > 0 && l.unit_price < l.cost;
                     return (
                       <TableRow key={l.product_id}>
                         <TableCell className="font-medium">{l.name}<div className="text-xs text-muted-foreground">Available: {formatNumber(l.stock)} {l.unit}</div></TableCell>
@@ -224,10 +228,10 @@ function NewSale() {
                               </SelectContent>
                             </Select>
                           </div>
-                          {belowCost && <div className="mt-1 flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3 w-3" />Below cost — minimum {formatCurrency(l.cost)}</div>}
+                          {belowCost && <div className="mt-1 flex items-center gap-1 text-xs text-destructive"><AlertTriangle className="h-3 w-3" />Below last purchase price: {formatCurrency(l.cost)} (allowed)</div>}
                           {l.cost > 0 && !belowCost && (
                             <div className="mt-1 text-xs text-muted-foreground">
-                              Cost: {formatCurrency(l.cost)}
+                              Last purchase: {formatCurrency(l.cost)}
                               {l.price_mode === "percent" && l.unit_price > 0 && <> · Price: {formatCurrency(l.unit_price)}</>}
                             </div>
                           )}
