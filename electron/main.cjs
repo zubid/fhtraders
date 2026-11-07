@@ -4,24 +4,42 @@ const isDev=!app.isPackaged;let localServer=null;const LOCAL_PORT=32145;
 function startBundledServer() {
   if (isDev) return Promise.resolve();
   const entry = path.join(process.resourcesPath, "app.asar.unpacked", ".output", "server", "index.mjs");
-  if (!fs.existsSync(entry)) throw new Error("Bundled application server is missing");
+  const logPath = path.join(app.getPath("userData"), "desktop-server.log");
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  const log = (message) => fs.appendFileSync(logPath, new Date().toISOString() + " " + message + "\\n");
+  log("Starting server: " + entry + " exists=" + fs.existsSync(entry));
+  if (!fs.existsSync(entry)) throw new Error("Bundled application server is missing: " + entry);
+  const output = fs.openSync(logPath, "a");
   localServer = spawn(process.execPath, [entry], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", PORT: String(LOCAL_PORT), HOST: "127.0.0.1" },
-    stdio: "ignore",
+    cwd: path.dirname(entry),
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_ENV: "production", PORT: String(LOCAL_PORT), HOST: "127.0.0.1" },
+    stdio: ["ignore", output, output],
     windowsHide: true,
   });
   return new Promise((resolve, reject) => {
+    let finished = false;
+    const fail = (reason) => {
+      if (finished) return;
+      finished = true;
+      log("FAILED: " + reason);
+      reject(new Error(reason + ". Check desktop-server.log in the FH Traders app data folder."));
+    };
+    localServer.on("error", (error) => fail("Server process failed: " + error.message));
+    localServer.on("exit", (code, signal) => fail("Server process exited: code=" + code + " signal=" + signal));
     const started = Date.now();
     const check = () => {
-      require("http").get(`http://127.0.0.1:${LOCAL_PORT}`, (response) => {
+      if (finished) return;
+      const req = require("http").get(`http://127.0.0.1:${LOCAL_PORT}`, (response) => {
         response.resume();
+        if (finished) return;
+        finished = true;
+        log("READY status=" + response.statusCode);
         resolve();
-      }).on("error", () => {
-        if (Date.now() - started > 15000) {
-          reject(new Error("Local application server did not start"));
-        } else {
-          setTimeout(check, 150);
-        }
+      });
+      req.setTimeout(1000, () => req.destroy());
+      req.on("error", () => {
+        if (Date.now() - started > 30000) fail("Local application server did not start within 30 seconds");
+        else setTimeout(check, 200);
       });
     };
     check();
