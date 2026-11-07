@@ -54,6 +54,23 @@ jobs:
           & ".\\node_modules\\electron\\dist\\electron.exe" "scripts/offline-smoke.cjs"
       - name: Build Windows installer
         run: bunx electron-builder --win --publish never
+      - name: Inspect packaged server files and launch diagnostics
+        shell: pwsh
+        run: |
+          $root = Join-Path (Get-Location) "release/win-unpacked/resources"
+          Write-Host "Resources:"
+          Get-ChildItem $root | Select-Object FullName
+          $entry = Join-Path $root "app.asar.unpacked/.output/server/index.mjs"
+          Write-Host "Unpacked server entry exists: $(Test-Path $entry)"
+          if (Test-Path $entry) {
+            Write-Host "Server directory listing:"
+            Get-ChildItem (Split-Path $entry) | Select-Object -First 15 Name
+          }
+          $asar = Join-Path $root "app.asar"
+          if (Test-Path $asar) {
+            Write-Host "ASAR bundled server listing:"
+            bunx asar list $asar | Select-String "server/index.mjs|electron/main.cjs" | Select-Object -First 10
+          }
       - name: Smoke test packaged desktop startup
         shell: pwsh
         run: |
@@ -74,6 +91,8 @@ jobs:
             if (-not $ready) { throw "Packaged desktop did not start its local web server within 45 seconds" }
             Write-Host "Packaged desktop process and local server started successfully."
           } finally {
+            Write-Host "AppData diagnostic logs:"
+            Get-ChildItem -Path $env:APPDATA -Filter desktop-server.log -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName; Get-Content $_.FullName -Tail 100 }
             $log = Join-Path $env:APPDATA "fhtraders/desktop-server.log"
             $other = Join-Path $env:APPDATA "FH Traders/desktop-server.log"
             foreach ($p in @($log, $other)) { if (Test-Path $p) { Write-Host "Server diagnostic log: $p"; Get-Content $p -Tail 100 } }
