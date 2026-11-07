@@ -5,6 +5,8 @@ on:
       - "supabase/migrations/**"
       - "scripts/test-sync-operation-guard.sql"
       - "scripts/test-sync-operation-update-guard.sql"
+      - "scripts/cloud-sync-reconciliation.sql"
+      - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   push:
     branches: [main]
@@ -12,6 +14,8 @@ on:
       - "supabase/migrations/**"
       - "scripts/test-sync-operation-guard.sql"
       - "scripts/test-sync-operation-update-guard.sql"
+      - "scripts/cloud-sync-reconciliation.sql"
+      - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   workflow_dispatch:
 permissions:
@@ -41,3 +45,5 @@ jobs:
           psql -h localhost -U postgres -d sync_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-guard.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sync_update_test'
           psql -h localhost -U postgres -d sync_update_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-update-guard.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sync_reconciliation_test'
+          psql -h localhost -U postgres -d sync_reconciliation_test -v ON_ERROR_STOP=1 -f scripts/test-cloud-sync-reconciliation.sql
