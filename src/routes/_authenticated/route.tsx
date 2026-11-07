@@ -35,10 +35,10 @@ function AuthenticatedLayout() {
   }, [loading, session, role, blocked, navigate]);
 
   useEffect(() => {
-    if (loading || !session || !window.fhDesktop?.isDesktop) return;
+    if (loading || !session || !role || !window.fhDesktop?.isDesktop) return;
     // Initial/reference refresh is best-effort. A network failure must never block the desktop UI.
     Promise.all([syncPendingPosSales(), syncPendingPurchases(), syncPendingNormalSales(), syncPendingPayments(), syncPendingExpenseVault(),syncPendingReturns()]).then(() => bootstrapDesktopReferenceData()).catch((error) => console.warn("[Desktop] Sync/bootstrap deferred:", error));
-  }, [loading, session]);
+  }, [loading, session, role]);
 
   useEffect(() => {
     if (loading || !session || !window.fhDesktop?.isDesktop) return;
@@ -47,7 +47,7 @@ function AuthenticatedLayout() {
     return () => window.removeEventListener("online", sync);
   }, [loading, session]);
 
-  if (loading || !session || blocked) {
+  if (loading || !session || !role || blocked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
