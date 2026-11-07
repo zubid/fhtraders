@@ -5,7 +5,8 @@ on:
       - "electron/**"
       - "src/**"
       - "package.json"
-      - "bun.lock"\n      - "scripts/offline-smoke.cjs"
+      - "bun.lock"
+      - "scripts/offline-smoke.cjs"
       - ".github/workflows/windows-desktop-build.yml"
   push:
     branches: [main]
