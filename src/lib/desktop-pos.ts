@@ -19,7 +19,7 @@ export function syncPendingPosSales(): Promise<void> {
    // SQLite CURRENT_TIMESTAMP is UTC without a timezone suffix.
    // Use the immutable local outbox timestamp, not the time of reconnection.
    const raw=String(row.created_at??"");
-   const iso=/^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$/.test(raw)
+   const iso=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)
     ?raw.replace(" ","T")+"Z":raw;
    const occurred=new Date(iso);
    if(!raw||Number.isNaN(occurred.getTime()))
