@@ -6,6 +6,7 @@ on:
       - "scripts/test-sync-operation-guard.sql"
       - "scripts/test-sync-operation-update-guard.sql"
       - "scripts/cloud-sync-reconciliation.sql"
+      - "scripts/cloud-sync-reconciliation-exceptions.sql"
       - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   push:
@@ -15,6 +16,7 @@ on:
       - "scripts/test-sync-operation-guard.sql"
       - "scripts/test-sync-operation-update-guard.sql"
       - "scripts/cloud-sync-reconciliation.sql"
+      - "scripts/cloud-sync-reconciliation-exceptions.sql"
       - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   workflow_dispatch:
