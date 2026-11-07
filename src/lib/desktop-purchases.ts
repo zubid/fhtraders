@@ -3,4 +3,12 @@ async function ensureCloudDevice(){const d=await window.fhDesktop!.getDevice();i
 export async function getDesktopPurchaseData(){return isDesktop()?window.fhDesktop!.getLocalPurchaseData():null}
 export async function getLocalPurchases(){return isDesktop()?window.fhDesktop!.getLocalPurchases():[]}
 export async function createDesktopPurchase(input:any){if(!isDesktop())throw new Error("Desktop purchase storage unavailable");const payload={...input,id:crypto.randomUUID(),operation_id:crypto.randomUUID()};const row=await window.fhDesktop!.createLocalPurchase(payload);void syncPendingPurchases();return row}
-export async function syncPendingPurchases(){if(!isDesktop()||!navigator.onLine)return;const deviceId=await ensureCloudDevice();const pending=await window.fhDesktop!.getPendingPurchaseSync();for(const row of pending){try{const p=row.payload;const {data,error}=await (supabase.rpc as any)("sync_purchase",{p_operation_id:row.id,p_device_id:deviceId,p_local_purchase_id:p.local_purchase_id,p_supplier_id:p.supplier_id||null,p_new_supplier_name:p.new_supplier_name||null,p_purchase_date:p.purchase_date,p_items:p.items.map((x:any)=>({product_id:x.product_id,quantity:x.quantity,unit_price:x.unit_price})),p_notes:p.notes||null,p_payments:p.payments||[]});if(error)throw error;await window.fhDesktop!.markPurchaseSynced(row.id,data)}catch(e:any){await window.fhDesktop!.markPurchaseFailed(row.id,e?.message??String(e))}}}
+let activeSync: Promise<void> | null = null;
+export function syncPendingPurchases(): Promise<void> {
+  // Route startup, reconnect, and new transactions may request sync together.
+  // Reuse one in-flight operation to prevent duplicate concurrent RPC replays.
+  if (activeSync) return activeSync;
+  activeSync = (async () => {if(!isDesktop()||!navigator.onLine)return;const deviceId=await ensureCloudDevice();const pending=await window.fhDesktop!.getPendingPurchaseSync();for(const row of pending){try{const p=row.payload;const {data,error}=await (supabase.rpc as any)("sync_purchase",{p_operation_id:row.id,p_device_id:deviceId,p_local_purchase_id:p.local_purchase_id,p_supplier_id:p.supplier_id||null,p_new_supplier_name:p.new_supplier_name||null,p_purchase_date:p.purchase_date,p_items:p.items.map((x:any)=>({product_id:x.product_id,quantity:x.quantity,unit_price:x.unit_price})),p_notes:p.notes||null,p_payments:p.payments||[]});if(error)throw error;await window.fhDesktop!.markPurchaseSynced(row.id,data)}catch(e:any){await window.fhDesktop!.markPurchaseFailed(row.id,e?.message??String(e))}}
+  })().finally(() => { activeSync = null; });
+  return activeSync;
+}
