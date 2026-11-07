@@ -16,7 +16,7 @@ import {
   Settings,
   Truck,
   Vault,
-  MonitorSmartphone, ScrollText, CloudCog,
+  MonitorSmartphone, ScrollText, CloudCog, Download,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +37,7 @@ const mainItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, adminOnly: true },
   { title: "Purchases", url: "/purchases", icon: ShoppingCart },
   { title: "POS", url: "/pos", icon: MonitorSmartphone },
+  { title: "Get Desktop App", url: "/desktop-download", icon: Download },
   { title: "Sales", url: "/sales", icon: Receipt },
   { title: "Payments", url: "/payments", icon: HandCoins, adminOnly: true },
   { title: "Expenses", url: "/expenses", icon: Wallet, adminOnly: true },
