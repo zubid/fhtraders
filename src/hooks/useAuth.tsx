@@ -27,14 +27,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.from("user_roles").select("role").eq("user_id", userId);
       if (error) throw error;
       const roles = (data ?? []).map((r) => r.role);
-      const resolved: Exclude<Role, null> = roles.includes("admin") ? "admin" : "staff";
+      const resolved: Role = roles.includes("admin") ? "admin" : roles.includes("staff") ? "staff" : null;
+      // Never manufacture a staff role for users without an explicit assignment.
+      if (!resolved) { setRole(null); return; }
       setRole(resolved);
       if (window.fhDesktop?.isDesktop) await window.fhDesktop.cacheAuthRole(userId, resolved, email);
       return;
     } catch (error) {
-      if (window.fhDesktop?.isDesktop) {
-        const cached = await window.fhDesktop.getCachedAuthRole(userId);
-        if (cached?.role === "admin" || cached?.role === "staff") { setRole(cached.role); return; }
+      if (window.fhDesktop?.isDesktop && !navigator.onLine) {
+        try {
+          const cached = await window.fhDesktop.getCachedAuthRole(userId);
+          // Cached authorization only accompanies an existing Supabase session.
+          if (cached?.role === "admin" || cached?.role === "staff") { setRole(cached.role); return; }
+        } catch (cacheError) { console.warn("[Auth] Local role cache unavailable", cacheError); }
       }
       setRole(null);
       console.warn("[Auth] Role could not be verified online or from desktop cache", error);
@@ -51,14 +56,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) throw error;
       setSession(data.session);
-      if (data.session?.user) {
-        fetchRole(data.session.user.id, data.session.user.email).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
+      if (data.session?.user) await fetchRole(data.session.user.id, data.session.user.email);
+    }).catch((error) => {
+      // A failed session read must not leave the app on an infinite spinner
+      // or grant access based only on an unverified cached role.
+      setSession(null);
+      setRole(null);
+      console.warn("[Auth] Could not restore a session", error);
+    }).finally(() => setLoading(false));
 
     return () => sub.subscription.unsubscribe();
   }, []);
