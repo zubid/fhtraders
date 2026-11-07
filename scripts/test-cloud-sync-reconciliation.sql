@@ -8,7 +8,7 @@ CREATE TABLE public.expenses(id uuid PRIMARY KEY);
 CREATE TABLE public.vault_topups(id uuid PRIMARY KEY);
 CREATE TABLE public.vault_cash_movements(id uuid PRIMARY KEY);
 CREATE TABLE public.inventory_adjustments(id uuid PRIMARY KEY, adjustment_type text NOT NULL);
-CREATE TABLE public.sync_operations(operation_id uuid PRIMARY KEY,entity_type text NOT NULL,entity_id uuid,status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),applied_at timestamptz);
+CREATE TABLE public.sync_operations(operation_id uuid PRIMARY KEY,device_id uuid,entity_type text NOT NULL,entity_id uuid,status text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),applied_at timestamptz);
 INSERT INTO public.sales(id) VALUES('11111111-1111-4111-8111-111111111111');
 INSERT INTO public.sync_operations(operation_id,entity_type,entity_id,status,applied_at) VALUES
  ('22222222-2222-4222-8222-222222222222','sales','11111111-1111-4111-8111-111111111111','applied',now()),
