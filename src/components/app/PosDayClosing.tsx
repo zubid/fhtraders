@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/app/ConfirmDialog";
+import { PosFinancialReportButtons } from "@/components/app/PosFinancialReport";
 import {
   buildFinalizeArgs, closeReadiness, expectedCashLabel,
   type MovementClass, type Preflight,
@@ -76,7 +77,7 @@ export function PosDayClosing() {
     },
     onSuccess: async (r) => {
       setPassword(""); setCash(""); setReason(""); setConfirmOpen(false);
-      toast.success(`POS day ${r.business_date} closed. Open the next day to resume sales.`);
+      toast.success(`POS day ${r.business_date} closed. Print your Z report from Closing History.`);
       await qc.invalidateQueries({ queryKey: ["pos-business-days"] });
       await qc.invalidateQueries({ queryKey: ["pos-closing-open-day"] });
     },
@@ -104,6 +105,10 @@ export function PosDayClosing() {
         <p>Sales count: <strong>{p.reconciliation.sale_count}</strong></p>
       </div>
 
+      <section className="space-y-2 rounded-md border p-4">
+        <h4 className="font-semibold">X Report — print before closing</h4>
+        <PosFinancialReportButtons dayId={day.data.id} kind="X" />
+      </section>
       <section className="space-y-2 rounded-md border p-4">
         <h4 className="font-semibold">1. Offline devices</h4>
         {p.active_devices.length === 0 ? <p className="text-sm text-muted-foreground">No registered offline devices.</p> :
