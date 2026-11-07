@@ -63,7 +63,7 @@ function VaultPage() {
     const customerRefunds=(refundAdjustments??[]).filter((x:any)=>x.vault_user_id===id&&x.adjustment_type==="customer_refund").reduce((n:number,x:any)=>n+Number(x.amount),0);
     return { topup, received, spend: purchase + split + expense, cashIn: cashIn+supplierRefunds, cashOut: cashOut+customerRefunds };
   };
-  const rows = desktop&&localVaultOps?.balances ? localVaultOps.balances.map((u:any)=>({...u,opening_balance:0,topup:0,received:0,cashIn:0,cashOut:0,spend:0,balance:Number(u.balance||0)})) : (users ?? []).map(u => { const s=sums(u.id); return { ...u, ...s, balance:Number(u.opening_balance)+s.topup+s.received+s.cashIn-s.cashOut-s.spend }; });
+  const rows: any[] = desktop&&localVaultOps?.balances ? localVaultOps.balances.map((u:any)=>({...u,opening_balance:0,topup:0,received:0,cashIn:0,cashOut:0,spend:0,balance:Number(u.balance||0)})) : (users ?? []).map(u => { const s=sums(u.id); return { ...u, ...s, balance:Number(u.opening_balance)+s.topup+s.received+s.cashIn-s.cashOut-s.spend }; });
   const businessCash = rows.filter(x=>x.vault_type!=="owner_cash").reduce((n,x)=>n+x.balance,0);
   const ownerCash = rows.filter(x=>x.vault_type==="owner_cash").reduce((n,x)=>n+x.balance,0);
   const ownerDistributions = (movements ?? []).filter(x=>!x.voided_at && x.movement_type==="owner_distribution").reduce((n,x)=>n+Number(x.amount),0);
