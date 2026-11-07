@@ -22,6 +22,7 @@ INSERT INTO public.sync_operations(operation_id,entity_type,entity_id,status,app
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','sale_returns','99999999-9999-4999-8999-999999999999','applied',now()),
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','supplier_returns','99999999-9999-4999-8999-999999999999','applied',now());
 \i scripts/cloud-sync-reconciliation.sql
+\i scripts/cloud-sync-reconciliation-exceptions.sql
 DO $$ BEGIN
  IF (SELECT count(*) FROM public.sync_operations WHERE status='applied' AND entity_id IS NULL) <> 1 THEN RAISE EXCEPTION 'Missing entity fixture mismatch'; END IF;
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='sales' AND NOT EXISTS(SELECT 1 FROM public.sales s WHERE s.id=o.entity_id)) <> 1 THEN RAISE EXCEPTION 'Missing sale fixture mismatch'; END IF;
