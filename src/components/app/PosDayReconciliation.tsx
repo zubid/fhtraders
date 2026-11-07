@@ -14,6 +14,12 @@ type Reconciliation = {
   other_vault_receipts: number; other_vault_payment_count: number;
   provisional_expected_cash: number; payment_methods: Record<string,number>; scope: string;
 };
+type Movements = {
+  expenses: number; expense_count: number; external_topups: number; topup_count: number;
+  transfers_in: number; transfer_in_count: number; transfers_out: number; transfer_out_count: number;
+  customer_refunds: number; customer_refund_count: number; supplier_refunds: number; supplier_refund_count: number;
+  known_vault_net_movement: number; scope: string;
+};
 const money = (v: number) => formatCurrency(Number(v) || 0);
 
 export function PosDayReconciliation() {
@@ -38,6 +44,16 @@ export function PosDayReconciliation() {
       const { data, error } = await (supabase.rpc as any)("get_pos_day_reconciliation", { p_day_id: selected });
       if (error) throw error;
       return data as Reconciliation;
+    },
+  });
+  const movements = useQuery({
+    queryKey: ["pos-day-movements", selected],
+    enabled: !desktop && !!selected,
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_pos_day_movements", { p_day_id: selected });
+      if (error) throw error;
+      return data as Movements;
     },
   });
   if (desktop) return <Card className="p-5">Online reconciliation is not available in offline desktop mode. Pending offline transactions are excluded.</Card>;
@@ -83,6 +99,30 @@ export function PosDayReconciliation() {
           </div>
           {report.data.other_vault_payment_count > 0 && <p role="alert" className="text-sm text-amber-700">Warning: {report.data.other_vault_payment_count} payment(s) were recorded in another vault. Review before closing.</p>}
           <p className="text-sm text-muted-foreground">{report.data.scope}. The provisional cash figure is not a final closing balance.</p>
+          <div className="space-y-3 border-t pt-4">
+            <h4 className="font-semibold">Task 4 — Refunds, Expenses & Vault Movements</h4>
+            {movements.isLoading ? <p>Loading movements...</p> : movements.isError ?
+              <p role="alert" className="text-sm text-destructive">Movement report unavailable: {(movements.error as Error).message}. Apply Task 4 migration.</p> :
+              movements.data && <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {([
+                    ["Expenses", movements.data.expenses],
+                    ["Customer refunds", movements.data.customer_refunds],
+                    ["Supplier refunds received", movements.data.supplier_refunds],
+                    ["External top-ups", movements.data.external_topups],
+                    ["Transfers in", movements.data.transfers_in],
+                    ["Transfers out", movements.data.transfers_out],
+                    ["Net recorded vault movements", movements.data.known_vault_net_movement],
+                  ] as [string,number][]).map(([label,value]) =>
+                    <div key={label} className="rounded-md border p-3">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="text-lg font-semibold">{money(value)}</p>
+                    </div>)}
+                </div>
+                <p className="text-sm text-muted-foreground">{movements.data.scope}</p>
+                <p role="note" className="text-sm font-medium">These movements are not automatically added to the provisional cash drawer total. Historical records lack POS-day links and payment-channel classification, so treating all of them as physical cash could give a false closing balance.</p>
+              </>}
+          </div>
         </div>}
     </>}
   </Card>;
