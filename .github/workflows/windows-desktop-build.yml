@@ -52,9 +52,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Web build failed" }
           $entry = ".output/server/index.mjs"
           if (-not (Test-Path $entry)) { throw "Node server entry missing" }
-          $source = Get-Content $entry -Raw
-          if ($source -notmatch "listen|createServer") { throw "Build output does not appear to contain an HTTP listener; check Nitro preset" }
-          Write-Host "Node server entry verified: $entry"
+          Write-Host "Node server entry exists: $entry (runtime startup will be verified after packaging)"
       - name: Rebuild native Electron dependencies
         run: bunx electron-builder install-app-deps
       - name: Run offline SQLite smoke test
