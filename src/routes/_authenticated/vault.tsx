@@ -40,7 +40,7 @@ function VaultPage() {
   const [top, setTop] = useState({ amount: 0, topup_date: today(), note: "" });
   const [movement, setMovement] = useState({ movement_type: "internal_transfer", source: "", destination: "", amount: 0, movement_date: today(), note: "" });
 
-  const get = (key: string, table: string, select = "*") => useQuery({ queryKey: [key], queryFn: async () => { if(desktop&&!navigator.onLine){if(table==="vault_users")return localVaultOps?.balances??[];if(table==="vault_topups")return localVaultOps?.topups??[];return [];}const { data, error } = await (supabase.from(table as any) as any).select(select); if (error){if(desktop)return [];throw error;}return (data ?? []) as any[]; } });
+  const get = (key: string, table: string, select = "*") => useQuery<any[]>({ queryKey: [key], queryFn: async () => { if(desktop&&!navigator.onLine){if(table==="vault_users")return localVaultOps?.balances??[];if(table==="vault_topups")return localVaultOps?.topups??[];return [];}const { data, error } = await (supabase.from(table as any) as any).select(select); if (error){if(desktop)return [];throw error;}return (data ?? []) as any[]; } });
   const { data: users, isLoading } = get("vault_users", "vault_users");
   const { data: topups } = get("vault_topups", "vault_topups");
   const { data: purchases } = get("vault_purchases_all", "purchases", "id,vault_user_id,amount_paid");
@@ -48,7 +48,7 @@ function VaultPage() {
   const { data: receipts } = get("vault_customer_payments_all", "payments", "id,vault_user_id,amount");
   const { data: supplierPayments } = get("vault_supplier_payments_all", "supplier_payments", "id,vault_user_id,amount,purchase_id");
   const { data: refundAdjustments } = get("vault_refund_adjustments_all", "vault_adjustments", "id,vault_user_id,amount,adjustment_type");
-  const { data: movements } = useQuery({ queryKey: ["vault_cash_movements",desktop], queryFn: async () => { const local=desktop?(localVaultOps?.movements??[]):[];if(desktop&&!navigator.onLine)return local;const { data, error } = await (supabase.from("vault_cash_movements" as any) as any).select("*").order("movement_date", { ascending: false }).order("created_at", { ascending: false }); if(error){if(desktop)return local;throw error;}return [...local.filter((x:any)=>x.sync_status!=="synced"),...(data??[])]; } });
+  const { data: movements } = useQuery<any[]>({ queryKey: ["vault_cash_movements",desktop], queryFn: async () => { const local=desktop?(localVaultOps?.movements??[]):[];if(desktop&&!navigator.onLine)return local;const { data, error } = await (supabase.from("vault_cash_movements" as any) as any).select("*").order("movement_date", { ascending: false }).order("created_at", { ascending: false }); if(error){if(desktop)return local;throw error;}return [...local.filter((x:any)=>x.sync_status!=="synced"),...(data??[])]; } });
 
   const splitIds = useMemo(() => { const map = new Map<string, Set<string>>(); for (const x of supplierPayments ?? []) if (x.purchase_id && x.vault_user_id) { if (!map.has(x.purchase_id)) map.set(x.purchase_id, new Set()); map.get(x.purchase_id)!.add(x.vault_user_id); } return new Set([...map].filter(([, ids]) => ids.size > 1).map(([id]) => id)); }, [supplierPayments]);
   const sums = (id: string) => {
