@@ -43,8 +43,18 @@ jobs:
             node --check $file
             if ($LASTEXITCODE -ne 0) { throw "Invalid JavaScript syntax: $file" }
           }
-      - name: Build web bundle
-        run: bun run build
+      - name: Build Node HTTP server for Electron
+        shell: pwsh
+        env:
+          NITRO_PRESET: node-server
+        run: |
+          bun run build
+          if ($LASTEXITCODE -ne 0) { throw "Web build failed" }
+          $entry = ".output/server/index.mjs"
+          if (-not (Test-Path $entry)) { throw "Node server entry missing" }
+          $source = Get-Content $entry -Raw
+          if ($source -notmatch "listen|createServer") { throw "Build output does not appear to contain an HTTP listener; check Nitro preset" }
+          Write-Host "Node server entry verified: $entry"
       - name: Rebuild native Electron dependencies
         run: bunx electron-builder install-app-deps
       - name: Run offline SQLite smoke test
