@@ -28,4 +28,4 @@ DO $$ BEGIN
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='restaurant_payments' AND NOT EXISTS(SELECT 1 FROM public.payments x WHERE x.id=o.entity_id)) <> 1 THEN RAISE EXCEPTION 'Missing payment fixture mismatch'; END IF;
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='sale_returns' AND NOT EXISTS(SELECT 1 FROM public.inventory_adjustments x WHERE x.id=o.entity_id AND x.adjustment_type='sale_return')) <> 1 THEN RAISE EXCEPTION 'Wrong return adjustment type was not detected'; END IF;
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='supplier_returns' AND NOT EXISTS(SELECT 1 FROM public.inventory_adjustments x WHERE x.id=o.entity_id AND x.adjustment_type='supplier_return')) <> 0 THEN RAISE EXCEPTION 'Valid supplier return was flagged'; END IF;
-END $;
+END $$;
