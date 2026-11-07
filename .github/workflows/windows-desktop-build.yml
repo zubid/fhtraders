@@ -1,4 +1,6 @@
 name: Windows Desktop Build
+permissions:
+  contents: write
 on:
   pull_request:
     paths:
@@ -51,3 +53,18 @@ jobs:
           name: fh-traders-windows
           path: release/**
           if-no-files-found: error
+      - name: Publish latest Windows installer to public release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $files = Get-ChildItem -Path release -Filter *.exe -File
+          if ($files.Count -eq 0) { throw "Windows installer EXE not found" }
+          gh release view desktop-latest --repo "$env:GITHUB_REPOSITORY" 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create desktop-latest --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "FH Traders Desktop - Latest Windows Installer" --notes "Latest successfully built Windows desktop installer. Verify offline sync before live transactions." --latest
+            if ($LASTEXITCODE -ne 0) { throw "Could not create desktop release" }
+          }
+          gh release upload desktop-latest $files.FullName --repo "$env:GITHUB_REPOSITORY" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Could not upload desktop installer" }
