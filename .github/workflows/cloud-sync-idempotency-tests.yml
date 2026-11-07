@@ -4,12 +4,14 @@ on:
     paths:
       - "supabase/migrations/**"
       - "scripts/test-sync-operation-guard.sql"
+      - "scripts/test-sync-operation-update-guard.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   push:
     branches: [main]
     paths:
       - "supabase/migrations/**"
       - "scripts/test-sync-operation-guard.sql"
+      - "scripts/test-sync-operation-update-guard.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
   workflow_dispatch:
 permissions:
@@ -35,4 +37,7 @@ jobs:
       - name: Verify applied sync operation guard on PostgreSQL
         env:
           PGPASSWORD: postgres
-        run: psql -h localhost -U postgres -d sync_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-guard.sql
+        run: |
+          psql -h localhost -U postgres -d sync_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-guard.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sync_update_test'
+          psql -h localhost -U postgres -d sync_update_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-update-guard.sql
