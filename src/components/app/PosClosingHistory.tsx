@@ -5,12 +5,12 @@ import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 
 type AuditEvent = {
- event_id: string; event_type: "day_opened" | "closing_draft" | "day_closed";
+ event_id: string; event_type: "day_opened" | "closing_draft" | "closing_finalized" | "day_closed";
  day_id: string; business_date: string; event_time: string; actor_id: string | null;
  cash_amount: number | null; note: string | null; event_status: string;
 };
 const labels: Record<AuditEvent["event_type"], string> = {
- day_opened: "Day opened", closing_draft: "Closing draft (not final)", day_closed: "Day closed",
+ day_opened: "Day opened", closing_draft: "Closing draft (not final)", closing_finalized: "Final closing authorized", day_closed: "Day closed",
 };
 export function PosClosingHistory() {
  const desktop = isDesktop();
@@ -34,7 +34,7 @@ export function PosClosingHistory() {
    <div className="space-y-3">
     {history.data.map(e => <div key={e.event_type + e.event_id} className="rounded-md border p-3">
      <div className="flex flex-wrap items-center justify-between gap-2">
-      <strong>{labels[e.event_type]}</strong>
+      <strong>{labels[e.event_type] ?? "Closing event"}</strong>
       <span className="text-xs text-muted-foreground">{new Date(e.event_time).toLocaleString("en-PK", {timeZone:"Asia/Karachi"})}</span>
      </div>
      <p className="text-sm">Business date: {e.business_date}</p>
