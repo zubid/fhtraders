@@ -69,6 +69,18 @@ function PosPage() {
     },
   });
 
+  const desktopPending = useQuery({
+    queryKey: ["pos-desktop-pending-day-guard"],
+    enabled: isDesktop(),
+    queryFn: async () => {
+      const rows = await window.fhDesktop!.getPendingPosSync();
+      return rows.map((row: any) => ({
+        id: row.id, created_at: String(row.created_at ?? ""), status: row.status,
+        error: row.last_error as string | null,
+      }));
+    },
+    refetchInterval: 10000,
+  });
   const dayStatus = useQuery({
     queryKey: ["pos-current-business-day"],
     enabled: !isDesktop(),
@@ -185,7 +197,9 @@ function PosPage() {
               : "Open today's POS business day in the Daily Opening tab before completing sales."}</p>
           </Card>}
           {isDesktop() && <Card className="mb-4 border-amber-500 p-4" role="alert">
-            <p className="text-sm">Desktop offline sales are not yet assigned to a POS business day. Pending cloud sync will require an open business day. Offline day reconciliation is scheduled for Task 8.</p>
+            <p className="text-sm">Offline POS sales retain their original local timestamp. Cloud sync requires an open business day matching that timestamp; previous-day sales are held for manual reconciliation.
+              {desktopPending.isError ? " Unable to read local pending queue." : desktopPending.data ? ` Pending or failed local POS sales: ${desktopPending.data.length}.` : " Checking local queue..."}
+              {desktopPending.data?.some((row) => row.status === "failed") ? " Some sales need attention in Sync Center." : ""}</p>
           </Card>}
           <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
             <Card className="p-4">
