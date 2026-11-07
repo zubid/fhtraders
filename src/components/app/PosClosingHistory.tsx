@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { isDesktop } from "@/lib/desktop-pos";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
+import { PosFinancialReportButtons } from "@/components/app/PosFinancialReport";
 
 type AuditEvent = {
  event_id: string; event_type: "day_opened" | "closing_draft" | "closing_finalized" | "day_closed";
@@ -41,6 +42,7 @@ export function PosClosingHistory() {
      <p className="text-sm">Recorded cash: {e.cash_amount == null ? "Not recorded" : formatCurrency(Number(e.cash_amount))}</p>
      <p className="text-xs text-muted-foreground">Operator ID: {e.actor_id ?? "Unknown"}</p>
      {e.note && <p className="text-sm">Note: {e.note}</p>}
+     {e.event_type === "day_closed" && <div className="mt-3 border-t pt-3"><PosFinancialReportButtons dayId={e.day_id} kind="Z" /></div>}
     </div>)}
    </div>}
  </Card>;
