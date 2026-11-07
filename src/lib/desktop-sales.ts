@@ -3,4 +3,12 @@ async function ensureCloudDevice(){const d=await window.fhDesktop!.getDevice();i
 export async function getDesktopNormalSaleData(){return isDesktop()?window.fhDesktop!.getLocalNormalSaleData():null}
 export async function getLocalNormalSales(){return isDesktop()?window.fhDesktop!.getLocalNormalSales():[]}
 export async function createDesktopNormalSale(input:any){if(!isDesktop())throw new Error("Desktop sale storage unavailable");const payload={...input,id:crypto.randomUUID(),operation_id:crypto.randomUUID()};const row=await window.fhDesktop!.createLocalNormalSale(payload);void syncPendingNormalSales();return row}
-export async function syncPendingNormalSales(){if(!isDesktop()||!navigator.onLine)return;const deviceId=await ensureCloudDevice();const pending=await window.fhDesktop!.getPendingNormalSaleSync();for(const row of pending){try{const p=row.payload;const {data,error}=await (supabase.rpc as any)("sync_normal_sale",{p_operation_id:row.id,p_device_id:deviceId,p_local_sale_id:p.local_sale_id,p_restaurant_id:p.restaurant_id,p_sale_date:p.sale_date,p_items:p.items.map((x:any)=>({product_id:x.product_id,quantity:x.quantity,unit_price:x.unit_price})),p_discount:p.discount||0,p_tax:p.tax||0,p_notes:p.notes||null,p_received:p.received||0,p_payment_method:p.payment_method||null,p_vault_user_id:p.vault_user_id||null});if(error)throw error;await window.fhDesktop!.markNormalSaleSynced(row.id,data)}catch(e:any){await window.fhDesktop!.markNormalSaleFailed(row.id,e?.message??String(e))}}}
+let activeSync: Promise<void> | null = null;
+export function syncPendingNormalSales(): Promise<void> {
+  // Route startup, reconnect, and new transactions may request sync together.
+  // Reuse one in-flight operation to prevent duplicate concurrent RPC replays.
+  if (activeSync) return activeSync;
+  activeSync = (async () => {if(!isDesktop()||!navigator.onLine)return;const deviceId=await ensureCloudDevice();const pending=await window.fhDesktop!.getPendingNormalSaleSync();for(const row of pending){try{const p=row.payload;const {data,error}=await (supabase.rpc as any)("sync_normal_sale",{p_operation_id:row.id,p_device_id:deviceId,p_local_sale_id:p.local_sale_id,p_restaurant_id:p.restaurant_id,p_sale_date:p.sale_date,p_items:p.items.map((x:any)=>({product_id:x.product_id,quantity:x.quantity,unit_price:x.unit_price})),p_discount:p.discount||0,p_tax:p.tax||0,p_notes:p.notes||null,p_received:p.received||0,p_payment_method:p.payment_method||null,p_vault_user_id:p.vault_user_id||null});if(error)throw error;await window.fhDesktop!.markNormalSaleSynced(row.id,data)}catch(e:any){await window.fhDesktop!.markNormalSaleFailed(row.id,e?.message??String(e))}}
+  })().finally(() => { activeSync = null; });
+  return activeSync;
+}

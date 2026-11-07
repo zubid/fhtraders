@@ -3,7 +3,12 @@ export const isDesktop=()=>typeof window!=="undefined"&&!!window.fhDesktop?.isDe
 export async function getDesktopPosData(){if(!isDesktop())return null;return window.fhDesktop!.getLocalPosData()}
 export async function createDesktopPosSale(input:any){if(!isDesktop())throw new Error("Desktop POS unavailable");const payload={...input,id:crypto.randomUUID(),operation_id:crypto.randomUUID()};const receipt=await window.fhDesktop!.createLocalPosSale(payload);void syncPendingPosSales();return receipt}
 async function ensureCloudDevice(){const d=await window.fhDesktop!.getDevice();if(d.cloud_device_id)return d.cloud_device_id;const {data,error}=await (supabase.rpc as any)("register_sync_device",{p_device_key:d.device_key,p_name:d.name||"FH Traders Desktop",p_location_label:null});if(error)throw error;await window.fhDesktop!.setCloudDevice(d.device_key,data);return data}
-export async function syncPendingPosSales(){
+let activeSync: Promise<void> | null = null;
+export function syncPendingPosSales(): Promise<void> {
+  // Route startup, reconnect, and new transactions may request sync together.
+  // Reuse one in-flight operation to prevent duplicate concurrent RPC replays.
+  if (activeSync) return activeSync;
+  activeSync = (async () => {
  if(!isDesktop()||!navigator.onLine)return;
  const pending=await window.fhDesktop!.getPendingPosSync();
  if(!pending.length)return;
@@ -34,5 +39,8 @@ export async function syncPendingPosSales(){
    await window.fhDesktop!.markPosFailed(row.id,e?.message??String(e));
   }
  }
+
+  })().finally(() => { activeSync = null; });
+  return activeSync;
 }
 export async function getDesktopReceipt(id:string){return isDesktop()?window.fhDesktop!.getLocalPosReceipt(id):null}
