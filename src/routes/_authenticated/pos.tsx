@@ -66,6 +66,22 @@ function PosPage() {
     },
   });
 
+  const dayStatus = useQuery({
+    queryKey: ["pos-current-business-day"],
+    enabled: !isDesktop(),
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("pos_business_days" as any) as any)
+        .select("id,business_date,status,vault_user_id")
+        .eq("status", "open").maybeSingle();
+      if (error) throw error;
+      return data as { id: string; business_date: string; status: string; vault_user_id: string } | null;
+    },
+    refetchInterval: 15000,
+  });
+  const pakistanToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const dayReady = !isDesktop() && !dayStatus.isPending && !dayStatus.isError &&
+    !!dayStatus.data && dayStatus.data.business_date === pakistanToday();
+
   const filtered = useMemo(() => {
     let rows = products ?? [];
     if (cat !== "all") rows = rows.filter((p) => p.category_id === cat);
@@ -96,6 +112,15 @@ function PosPage() {
 
   const complete = useMutation({
     mutationFn: async () => {
+      if (!isDesktop()) {
+        const { data: activeDay, error: dayError } = await (supabase.from("pos_business_days" as any) as any)
+          .select("id,business_date,vault_user_id").eq("status", "open").maybeSingle();
+        if (dayError) throw dayError;
+        if (!activeDay || activeDay.business_date !== pakistanToday())
+          throw new Error("Open today's POS business day before completing a sale.");
+        if (vaultId !== activeDay.vault_user_id)
+          throw new Error("Select the same cash vault used for today's POS opening.");
+      }
       if (!cart.length) throw new Error("Cart is empty");
       if (overStock.length) throw new Error(`Invalid quantity for ${overStock[0].name}`);
       if (discount > subtotal) throw new Error("Discount exceeds subtotal");
@@ -149,6 +174,16 @@ function PosPage() {
       <Tabs defaultValue="sell">
         <TabsList className="mb-4"><TabsTrigger value="sell">Sell</TabsTrigger><TabsTrigger value="opening">Daily Opening</TabsTrigger><TabsTrigger value="history">History</TabsTrigger><TabsTrigger value="audit">Adjustments & Returns</TabsTrigger></TabsList>
         <TabsContent value="sell">
+          {!isDesktop() && !dayReady && <Card className="mb-4 border-amber-500 p-4" role="alert">
+            <p className="font-semibold">POS daily opening required</p>
+            <p className="text-sm text-muted-foreground">{dayStatus.isError
+              ? "Unable to verify the POS business day. Check the Task 1 database migration."
+              : dayStatus.isPending ? "Checking today's POS business day..."
+              : "Open today's POS business day in the Daily Opening tab before completing sales."}</p>
+          </Card>}
+          {isDesktop() && <Card className="mb-4 border-amber-500 p-4" role="alert">
+            <p className="text-sm">Desktop offline sales are not yet assigned to a POS business day. Pending cloud sync will require an open business day. Offline day reconciliation is scheduled for Task 8.</p>
+          </Card>}
           <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
             <Card className="p-4">
               <div className="mb-3 flex flex-col gap-2 sm:flex-row">
@@ -224,7 +259,7 @@ function PosPage() {
                 {discount > 0 && <div className="flex justify-between text-sm"><span>Discount</span><span>-{formatCurrency(discount)}</span></div>}
                 <div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatCurrency(grand)}</span></div>
                 {tendered !== "" && <div className="flex justify-between text-sm text-muted-foreground"><span>Change</span><span>{formatCurrency(change)}</span></div>}
-                <Button className="h-12 w-full text-base" onClick={onComplete} disabled={complete.isPending || !cart.length}>
+                <Button className="h-12 w-full text-base" onClick={onComplete} disabled={complete.isPending || !cart.length || (!isDesktop() && !dayReady)}>
                   {complete.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Complete Sale
                 </Button>
               </div>
