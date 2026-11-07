@@ -47,7 +47,11 @@ function AuthenticatedLayout() {
     return () => window.removeEventListener("online", sync);
   }, [loading, session]);
 
-  if (loading || !session || !role || blocked) {
+  if (!loading && session && !role) {
+    return <div className="flex min-h-screen items-center justify-center p-6 text-center text-destructive">Access denied: your account permissions could not be verified. Reconnect to the internet and sign in again, or contact an administrator.</div>;
+  }
+
+  if (loading || !session || blocked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
