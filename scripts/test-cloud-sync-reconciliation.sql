@@ -21,4 +21,4 @@ DO $$ BEGIN
  IF (SELECT count(*) FROM public.sync_operations WHERE status='applied' AND entity_id IS NULL) <> 1 THEN RAISE EXCEPTION 'Missing entity fixture mismatch'; END IF;
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='sales' AND NOT EXISTS(SELECT 1 FROM public.sales s WHERE s.id=o.entity_id)) <> 1 THEN RAISE EXCEPTION 'Missing sale fixture mismatch'; END IF;
  IF (SELECT count(*) FROM public.sync_operations o WHERE status='applied' AND entity_type='restaurant_payments' AND NOT EXISTS(SELECT 1 FROM public.payments x WHERE x.id=o.entity_id)) <> 1 THEN RAISE EXCEPTION 'Missing payment fixture mismatch'; END IF;
-END $;
+END $$;
