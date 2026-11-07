@@ -74,6 +74,9 @@ jobs:
             if (-not $ready) { throw "Packaged desktop did not start its local web server within 45 seconds" }
             Write-Host "Packaged desktop process and local server started successfully."
           } finally {
+            $log = Join-Path $env:APPDATA "fhtraders/desktop-server.log"
+            $other = Join-Path $env:APPDATA "FH Traders/desktop-server.log"
+            foreach ($p in @($log, $other)) { if (Test-Path $p) { Write-Host "Server diagnostic log: $p"; Get-Content $p -Tail 100 } }
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "FH Traders.exe" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
           }
