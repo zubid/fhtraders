@@ -7,6 +7,7 @@ on:
       - "scripts/test-sync-operation-update-guard.sql"
       - "scripts/cloud-sync-reconciliation.sql"
       - "scripts/cloud-sync-schema-preflight.sql"
+      - "scripts/test-cloud-schema-preflight.sh"
       - "scripts/cloud-sync-reconciliation-exceptions.sql"
       - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
@@ -18,6 +19,7 @@ on:
       - "scripts/test-sync-operation-update-guard.sql"
       - "scripts/cloud-sync-reconciliation.sql"
       - "scripts/cloud-sync-schema-preflight.sql"
+      - "scripts/test-cloud-schema-preflight.sh"
       - "scripts/cloud-sync-reconciliation-exceptions.sql"
       - "scripts/test-cloud-sync-reconciliation.sql"
       - ".github/workflows/cloud-sync-idempotency-tests.yml"
@@ -51,3 +53,4 @@ jobs:
           psql -h localhost -U postgres -d sync_update_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-update-guard.sql
           psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sync_reconciliation_test'
           psql -h localhost -U postgres -d sync_reconciliation_test -v ON_ERROR_STOP=1 -f scripts/test-cloud-sync-reconciliation.sql
+          PGHOST=localhost PGUSER=postgres PGDATABASE=sync_reconciliation_test bash scripts/test-cloud-schema-preflight.sh
