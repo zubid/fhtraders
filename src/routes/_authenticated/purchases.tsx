@@ -47,13 +47,23 @@ function PurchasesPage() {
       const desktop = isDesktop();
       const local = desktop ? await getLocalPurchases() : [];
       if (desktop && !navigator.onLine) return local;
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("*, suppliers(name), vault_users(name), purchase_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
-        .order("purchase_date", { ascending: false });
-      if (error) { if (desktop) return local; throw error; }
-      const pendingLocal = local.filter((p:any) => p.sync_status !== "synced");
-      return [...pendingLocal, ...(data ?? [])] as any[];
+      // Read every cloud page: a default PostgREST limit silently drops older invoices.
+      const cloudRows: any[] = [];
+      const pageSize = 500;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from("purchases")
+          .select("*, suppliers(name), vault_users(name), purchase_items(id, product_id, quantity, unit_price, line_total, products(name, unit))")
+          .order("purchase_date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) { if (desktop) return local; throw error; }
+        cloudRows.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+      const cloudIds = new Set(cloudRows.map((row: any) => row.id));
+      const pendingLocal = local.filter((row: any) => row.sync_status !== "synced" && !cloudIds.has(row.cloud_id));
+      return [...pendingLocal, ...cloudRows] as any[];
     },
   });
   const { data: vaultUsers } = useQuery({
