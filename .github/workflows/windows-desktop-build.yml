@@ -53,6 +53,29 @@ jobs:
           & ".\\node_modules\\electron\\dist\\electron.exe" "scripts/offline-smoke.cjs"
       - name: Build Windows installer
         run: bunx electron-builder --win --publish never
+      - name: Smoke test packaged desktop startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Get-Location) "release/win-unpacked/FH Traders.exe"
+          if (-not (Test-Path $exe)) { throw "Packaged desktop executable not found: $exe" }
+          $proc = Start-Process -FilePath $exe -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 45; $i++) {
+              Start-Sleep -Seconds 1
+              $proc.Refresh()
+              if ($proc.HasExited) { throw "Packaged desktop exited during startup (code $($proc.ExitCode))" }
+              try {
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:32145" -UseBasicParsing -TimeoutSec 2
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw "Packaged desktop did not start its local web server within 45 seconds" }
+            Write-Host "Packaged desktop process and local server started successfully."
+          } finally {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "FH Traders.exe" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          }
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +88,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $files = Get-ChildItem -Path release -Filter *.exe -File
+          $files = @(Get-ChildItem -Path release -Filter *.exe -File)
           if ($files.Count -eq 0) { throw "Windows installer EXE not found" }
           gh release view desktop-latest --repo "$env:GITHUB_REPOSITORY" 2>$null
           if ($LASTEXITCODE -ne 0) {
