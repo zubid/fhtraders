@@ -28,7 +28,9 @@ If any required table is absent, **stop** and reconcile schema differences in th
 
 Run `\i scripts/cloud-sync-schema-preflight.sql` first. **Any returned rows mean stop:** resolve the reported schema mismatch in the repository before running reconciliation. Zero rows indicate that the required tables and columns are present, but do not prove permissions or semantic compatibility.
 
-Execute each report inside a read-only transaction:
+For an automated fail-closed path, after confirming the database and using read-only credentials, set `FH_RECONCILIATION_CONFIRMED=yes` and run `bash scripts/run-cloud-reconciliation.sh`. The runner stops when preflight returns any schema issue and does not execute financial reports. This flag is an explicit operator acknowledgement, **not** a substitute for checking the database identity or access permissions.
+
+Alternatively, execute each report inside a read-only transaction:
 
 ```sql
 BEGIN READ ONLY;
