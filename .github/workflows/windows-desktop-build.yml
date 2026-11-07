@@ -7,6 +7,15 @@ on:
       - "package.json"
       - "bun.lock"\n      - "scripts/offline-smoke.cjs"
       - ".github/workflows/windows-desktop-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "electron/**"
+      - "src/**"
+      - "package.json"
+      - "bun.lock"
+      - "scripts/offline-smoke.cjs"
+      - ".github/workflows/windows-desktop-build.yml"
   workflow_dispatch:
 jobs:
   build-windows:
