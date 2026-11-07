@@ -1,0 +1,39 @@
+name: POS Daily Closing Release Gates
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "electron/**"
+      - "supabase/migrations/**"
+      - "scripts/check-pos-day-release.mjs"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pos-day-release-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "electron/**"
+      - "supabase/migrations/**"
+      - "scripts/check-pos-day-release.mjs"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pos-day-release-gates.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pos-build-and-static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Check POS migration and fail-closed invariants
+        run: node scripts/check-pos-day-release.mjs
+      - name: Build application
+        run: bun run build
