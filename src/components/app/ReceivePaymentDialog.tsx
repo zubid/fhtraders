@@ -40,7 +40,7 @@ export function ReceivePaymentDialog({
   const [target, setTarget] = useState<string>("fifo");
   const [vaultUserId, setVaultUserId] = useState<string>("");
 
-  const { data: sales } = useQuery({
+  const { data: sales } = useQuery<any[]>({
     queryKey: ["unpaid-sales", restaurantId],
     enabled: open && !!restaurantId,
     queryFn: async () => {
