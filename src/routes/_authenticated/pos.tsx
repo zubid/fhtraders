@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { PosAdjustmentDialog } from "@/components/app/PosAdjustmentDialog";
 import { AdjustmentReport } from "@/components/app/AdjustmentReport";
 import { PosDailyOpening } from "@/components/app/PosDailyOpening";
+import { PosDayReconciliation } from "@/components/app/PosDayReconciliation";
 import { createDesktopPosSale, getDesktopPosData, getDesktopReceipt, isDesktop, syncPendingPosSales } from "@/lib/desktop-pos";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,7 +173,7 @@ function PosPage() {
     <div>
       <PageHeader title="POS" description={`Counter sales · ${user?.email ?? ""}`} />
       <Tabs defaultValue="sell">
-        <TabsList className="mb-4"><TabsTrigger value="sell">Sell</TabsTrigger><TabsTrigger value="opening">Daily Opening</TabsTrigger><TabsTrigger value="history">History</TabsTrigger><TabsTrigger value="audit">Adjustments & Returns</TabsTrigger></TabsList>
+        <TabsList className="mb-4"><TabsTrigger value="sell">Sell</TabsTrigger><TabsTrigger value="opening">Daily Opening</TabsTrigger><TabsTrigger value="reconciliation">Reconciliation</TabsTrigger><TabsTrigger value="history">History</TabsTrigger><TabsTrigger value="audit">Adjustments & Returns</TabsTrigger></TabsList>
         <TabsContent value="sell">
           {!isDesktop() && !dayReady && <Card className="mb-4 border-amber-500 p-4" role="alert">
             <p className="font-semibold">POS daily opening required</p>
@@ -267,6 +268,7 @@ function PosPage() {
           </div>
         </TabsContent>
         <TabsContent value="opening"><PosDailyOpening /></TabsContent>
+        <TabsContent value="reconciliation"><PosDayReconciliation /></TabsContent>
         <TabsContent value="history"><PosHistory onPrint={reprint} /></TabsContent><TabsContent value="audit"><AdjustmentReport /></TabsContent>
       </Tabs>
     </div>
