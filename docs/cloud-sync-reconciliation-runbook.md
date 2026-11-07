@@ -26,6 +26,8 @@ ORDER BY table_name;
 
 If any required table is absent, **stop** and reconcile schema differences in the repository first. Do not create tables or apply migrations as a workaround.
 
+Run `\i scripts/cloud-sync-schema-preflight.sql` first. **Any returned rows mean stop:** resolve the reported schema mismatch in the repository before running reconciliation. Zero rows indicate that the required tables and columns are present, but do not prove permissions or semantic compatibility.
+
 Execute each report inside a read-only transaction:
 
 ```sql
