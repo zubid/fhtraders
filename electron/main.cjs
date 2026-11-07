@@ -1,7 +1,50 @@
 const {openLocalDatabase,bootstrap:bootstrapLocal,status:localStatus,listPosData,createLocalPosSale,getLocalReceipt,pendingPos,markPosSynced,markPosFailed,getDevice,setCloudDeviceId,syncCenter,syncSummary,retrySync,listPurchaseData,createLocalPurchase,listLocalPurchases,pendingPurchases,markPurchaseSynced,markPurchaseFailed,listNormalSaleData,createLocalNormalSale,listLocalNormalSales,pendingNormalSales,markNormalSaleSynced,markNormalSaleFailed,paymentData,createLocalRestaurantPayment,createLocalSupplierPayment,listLocalRestaurantPayments,pendingPayments,markPaymentSynced,markPaymentFailed,expenseVaultData,createLocalExpense,createLocalVaultTopup,createLocalCashMovement,listLocalExpenses,listLocalVaultOps,pendingExpenseVault,markExpenseVaultSynced,markExpenseVaultFailed,returnData,createLocalReturn,pendingReturns,markReturnSynced,markReturnFailed,reconciliation,cacheAuthRole,getCachedAuthRole,clearCachedAuthRole}=require("./local-db.cjs");
 const {app,BrowserWindow,ipcMain,shell}=require("electron");const path=require("path");const fs=require("fs");const {spawn}=require("child_process");
 const isDev=!app.isPackaged;let localServer=null;const LOCAL_PORT=32145;
-function startBundledServer(){if(isDev)return Promise.resolve();const entry=path.join(process.resourcesPath,"app.asar.unpacked",".output","server","index.mjs");if(!fs.existsSync(entry))throw new Error("Bundled application server is missing");localServer=spawn(process.execPath,[entry],{env:{...process.env,ELECTRON_RUN_AS_NODE:"1",PORT:String(LOCAL_PORT),HOST:"127.0.0.1"},stdio:"ignore",windowsHide:true});return new Promise((resolve,reject)=>{const started=Date.now();const check=()=>{require("http").get(`http://127.0.0.1:${LOCAL_PORT}`,r=>{r.resume();resolve();}).on("error",()=>{if(Date.now()-started>15000)reject(new Error("Local application server did not start"));else setTimeout(check,150)});check()})}
+function startBundledServer() {
+  if (isDev) return Promise.resolve();
+  const entry = path.join(process.resourcesPath, "app.asar.unpacked", ".output", "server", "index.mjs");
+  const logPath = path.join(app.getPath("userData"), "desktop-server.log");
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  const log = (message) => fs.appendFileSync(logPath, new Date().toISOString() + " " + message + "\\n");
+  log("Starting server: " + entry + " exists=" + fs.existsSync(entry));
+  if (!fs.existsSync(entry)) throw new Error("Bundled application server is missing: " + entry);
+  const output = fs.openSync(logPath, "a");
+  localServer = spawn(process.execPath, [entry], {
+    cwd: path.dirname(entry),
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_ENV: "production", PORT: String(LOCAL_PORT), HOST: "127.0.0.1" },
+    stdio: ["ignore", output, output],
+    windowsHide: true,
+  });
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const fail = (reason) => {
+      if (finished) return;
+      finished = true;
+      log("FAILED: " + reason);
+      reject(new Error(reason + ". Check desktop-server.log in the FH Traders app data folder."));
+    };
+    localServer.on("error", (error) => fail("Server process failed: " + error.message));
+    localServer.on("exit", (code, signal) => fail("Server process exited: code=" + code + " signal=" + signal));
+    const started = Date.now();
+    const check = () => {
+      if (finished) return;
+      const req = require("http").get(`http://127.0.0.1:${LOCAL_PORT}`, (response) => {
+        response.resume();
+        if (finished) return;
+        finished = true;
+        log("READY status=" + response.statusCode);
+        resolve();
+      });
+      req.setTimeout(1000, () => req.destroy());
+      req.on("error", () => {
+        if (Date.now() - started > 30000) fail("Local application server did not start within 30 seconds");
+        else setTimeout(check, 200);
+      });
+    };
+    check();
+  });
+}
 function state(){const dir=app.getPath("userData");fs.mkdirSync(dir,{recursive:true});return {platform:process.platform,version:app.getVersion(),dataDirectory:dir,isPackaged:app.isPackaged};}
 function createWindow(){const win=new BrowserWindow({width:1440,height:900,minWidth:1100,minHeight:700,show:false,backgroundColor:"#ffffff",webPreferences:{preload:path.join(__dirname,"preload.cjs"),contextIsolation:true,nodeIntegration:false,sandbox:true}});
 win.once("ready-to-show",()=>win.show());win.webContents.setWindowOpenHandler(({url})=>{if(/^https?:/.test(url)){shell.openExternal(url);return {action:"deny"}}return {action:"allow"}});

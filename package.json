@@ -131,7 +131,7 @@
     ],
     "npmRebuild": true
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "FH Traders offline-first desktop and web management system",
   "author": "FH Traders"
 }

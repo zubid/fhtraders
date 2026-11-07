@@ -39,11 +39,20 @@ jobs:
       - name: Validate Electron JavaScript syntax
         shell: pwsh
         run: |
-          node --check electron/main.cjs
-          node --check electron/preload.cjs
-          node --check electron/local-db.cjs
-      - name: Build web bundle
-        run: bun run build
+          foreach ($file in @("electron/main.cjs", "electron/preload.cjs", "electron/local-db.cjs")) {
+            node --check $file
+            if ($LASTEXITCODE -ne 0) { throw "Invalid JavaScript syntax: $file" }
+          }
+      - name: Build Node HTTP server for Electron
+        shell: pwsh
+        env:
+          NITRO_PRESET: node-server
+        run: |
+          bun run build
+          if ($LASTEXITCODE -ne 0) { throw "Web build failed" }
+          $entry = ".output/server/index.mjs"
+          if (-not (Test-Path $entry)) { throw "Node server entry missing" }
+          Write-Host "Node server entry exists: $entry (runtime startup will be verified after packaging)"
       - name: Rebuild native Electron dependencies
         run: bunx electron-builder install-app-deps
       - name: Run offline SQLite smoke test
@@ -53,6 +62,51 @@ jobs:
           & ".\\node_modules\\electron\\dist\\electron.exe" "scripts/offline-smoke.cjs"
       - name: Build Windows installer
         run: bunx electron-builder --win --publish never
+      - name: Inspect packaged server files and launch diagnostics
+        shell: pwsh
+        run: |
+          $root = Join-Path (Get-Location) "release/win-unpacked/resources"
+          Write-Host "Resources:"
+          Get-ChildItem $root | Select-Object FullName
+          $entry = Join-Path $root "app.asar.unpacked/.output/server/index.mjs"
+          Write-Host "Unpacked server entry exists: $(Test-Path $entry)"
+          if (Test-Path $entry) {
+            Write-Host "Server directory listing:"
+            Get-ChildItem (Split-Path $entry) | Select-Object -First 15 Name
+          }
+          $asar = Join-Path $root "app.asar"
+          if (Test-Path $asar) {
+            Write-Host "ASAR bundled server listing:"
+            bunx asar list $asar | Select-String "server/index.mjs|electron/main.cjs" | Select-Object -First 10
+          }
+      - name: Smoke test packaged desktop startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path (Get-Location) "release/win-unpacked/FH Traders.exe"
+          if (-not (Test-Path $exe)) { throw "Packaged desktop executable not found: $exe" }
+          $proc = Start-Process -FilePath $exe -PassThru
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 45; $i++) {
+              Start-Sleep -Seconds 1
+              $proc.Refresh()
+              if ($proc.HasExited) { throw "Packaged desktop exited during startup (code $($proc.ExitCode))" }
+              try {
+                $response = Invoke-WebRequest -Uri "http://127.0.0.1:32145" -UseBasicParsing -TimeoutSec 2
+                if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { $ready = $true; break }
+              } catch {}
+            }
+            if (-not $ready) { throw "Packaged desktop did not start its local web server within 45 seconds" }
+            Write-Host "Packaged desktop process and local server started successfully."
+          } finally {
+            Write-Host "AppData diagnostic logs:"
+            Get-ChildItem -Path $env:APPDATA -Filter desktop-server.log -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName; Get-Content $_.FullName -Tail 100 }
+            $log = Join-Path $env:APPDATA "fhtraders/desktop-server.log"
+            $other = Join-Path $env:APPDATA "FH Traders/desktop-server.log"
+            foreach ($p in @($log, $other)) { if (Test-Path $p) { Write-Host "Server diagnostic log: $p"; Get-Content $p -Tail 100 } }
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "FH Traders.exe" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          }
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $files = Get-ChildItem -Path release -Filter *.exe -File
+          $files = @(Get-ChildItem -Path release -Filter *.exe -File)
           if ($files.Count -eq 0) { throw "Windows installer EXE not found" }
           gh release view desktop-latest --repo "$env:GITHUB_REPOSITORY" 2>$null
           if ($LASTEXITCODE -ne 0) {
