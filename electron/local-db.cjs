@@ -141,7 +141,19 @@ function markReturnFailed(d,op,error){
   return true;
  })();
 }
-function reconciliation(d){const pending=d.prepare("SELECT count(*) c FROM sync_outbox WHERE status='pending'").get().c,failed=d.prepare("SELECT count(*) c FROM sync_outbox WHERE status='failed'").get().c;const negative=d.prepare("SELECT count(*) c FROM products WHERE current_stock < -0.000001").get().c;const invalid=d.prepare("SELECT count(*) c FROM return_invoice_items WHERE returned_qty<0 OR returned_qty>quantity+0.000001").get().c;const orphan=d.prepare("SELECT count(*) c FROM sync_outbox o LEFT JOIN local_returns r ON r.id=o.entity_id WHERE o.entity_type IN ('sale_returns','supplier_returns') AND r.id IS NULL").get().c;return {pending,failed,negativeStock:negative,invalidReturnQuantities:invalid,orphanReturnOperations:orphan,healthy:failed===0&&negative===0&&invalid===0&&orphan===0}}
+function reconciliation(d){
+ const pending=d.prepare("SELECT count(*) c FROM sync_outbox WHERE status='pending'").get().c;
+ const failed=d.prepare("SELECT count(*) c FROM sync_outbox WHERE status='failed'").get().c;
+ const negative=d.prepare("SELECT count(*) c FROM products WHERE current_stock < -0.000001").get().c;
+ const invalid=d.prepare("SELECT count(*) c FROM return_invoice_items WHERE returned_qty<0 OR returned_qty>quantity+0.000001").get().c;
+ const orphan=d.prepare("SELECT count(*) c FROM sync_outbox o LEFT JOIN local_returns r ON r.id=o.entity_id WHERE o.entity_type IN ('sale_returns','supplier_returns') AND r.id IS NULL").get().c;
+ // Flag locally created financial records with no replayable outbox operation.
+ // Use operation_id, not entity_id, so every financial stream is checked consistently.
+ const sources=['pos_sales','local_purchases','local_sales','local_restaurant_payments','local_supplier_payments','local_expenses','local_vault_topups','local_cash_movements','local_returns'];
+ const missingOutbox=sources.reduce((sum,table)=>sum+d.prepare(`SELECT count(*) c FROM ${table} t LEFT JOIN sync_outbox o ON o.id=t.operation_id WHERE t.operation_id IS NOT NULL AND o.id IS NULL`).get().c,0);
+ const statusMismatch=sources.reduce((sum,table)=>sum+d.prepare(`SELECT count(*) c FROM ${table} t JOIN sync_outbox o ON o.id=t.operation_id WHERE (o.status='synced' AND t.sync_status!='synced') OR (o.status='pending' AND t.sync_status='synced')`).get().c,0);
+ return {pending,failed,negativeStock:negative,invalidReturnQuantities:invalid,orphanReturnOperations:orphan,missingOutboxOperations:missingOutbox,syncStatusMismatches:statusMismatch,healthy:failed===0&&negative===0&&invalid===0&&orphan===0&&missingOutbox===0&&statusMismatch===0};
+}
 function cacheAuthRole(d,userId,role,email){if(!userId||!['admin','staff'].includes(role))throw new Error("Invalid auth cache");d.prepare("INSERT INTO local_auth_cache(user_id,role,email) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET role=excluded.role,email=excluded.email,updated_at=CURRENT_TIMESTAMP").run(userId,role,email||null);return {user_id:userId,role,email:email||null}}
 function getCachedAuthRole(d,userId){return d.prepare("SELECT user_id,role,email,updated_at FROM local_auth_cache WHERE user_id=?").get(userId)||null}
 function clearCachedAuthRole(d,userId){if(userId)d.prepare("DELETE FROM local_auth_cache WHERE user_id=?").run(userId)}
