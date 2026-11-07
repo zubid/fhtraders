@@ -21,6 +21,10 @@ INSERT INTO public.inventory_adjustments(id,adjustment_type) VALUES('99999999-99
 INSERT INTO public.sync_operations(operation_id,entity_type,entity_id,status,applied_at) VALUES
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','sale_returns','99999999-9999-4999-8999-999999999999','applied',now()),
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','supplier_returns','99999999-9999-4999-8999-999999999999','applied',now());
+\i scripts/cloud-sync-schema-preflight.sql
+DO $ BEGIN
+ IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sync_operations' AND column_name='nonexistent_preflight_column') THEN RAISE EXCEPTION 'Unexpected fixture column'; END IF;
+END $;
 \i scripts/cloud-sync-reconciliation.sql
 \i scripts/cloud-sync-reconciliation-exceptions.sql
 DO $$ BEGIN
