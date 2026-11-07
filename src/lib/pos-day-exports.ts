@@ -24,13 +24,14 @@ export function exportPosExcel(data: PosExportData) {
   save(xml, "application/vnd.ms-excel;charset=utf-8", `pos-day-${safeName(data.businessDate)}.xls`);
 }
 export function printPosDay(data: PosExportData, receipt58mm: boolean) {
-  const win = window.open("", "_blank", "noopener,noreferrer,width=700,height=850");
+  const win = window.open("", "_blank", "width=700,height=850");
   if (!win) throw new Error("Allow pop-ups to print or save PDF.");
-  const width = receipt58mm ? "58mm" : "190mm";
+  win.opener = null;
+  const width = receipt58mm ? "54mm" : "190mm";
   const rows = data.rows.map(([name,value]) => `<tr><td>${escapeXml(name)}</td><td>${escapeXml(value)}</td></tr>`).join("");
   win.document.open();
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>POS ${escapeXml(data.businessDate)}</title>
-<style>@page{size:${receipt58mm ? "58mm auto" : "A4"};margin:${receipt58mm ? "2mm" : "12mm"}}
+<style>@page{size:${receipt58mm ? "58mm 200mm" : "A4"};margin:${receipt58mm ? "2mm" : "12mm"}}
 body{font-family:Arial,sans-serif;width:${width};max-width:100%;margin:0 auto;color:#111;font-size:${receipt58mm ? "10px" : "12px"}}
 h1{font-size:${receipt58mm ? "13px" : "20px"};margin:8px 0}
 table{width:100%;border-collapse:collapse;table-layout:fixed}td{border-bottom:1px dashed #aaa;padding:5px 2px;overflow-wrap:anywhere}td:last-child{text-align:right;width:42%}
