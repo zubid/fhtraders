@@ -39,4 +39,5 @@ jobs:
           PGPASSWORD: postgres
         run: |
           psql -h localhost -U postgres -d sync_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-guard.sql
-          psql -h localhost -U postgres -d sync_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-update-guard.sql
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE sync_update_test'
+          psql -h localhost -U postgres -d sync_update_test -v ON_ERROR_STOP=1 -f scripts/test-sync-operation-update-guard.sql
