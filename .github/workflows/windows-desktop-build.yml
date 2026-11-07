@@ -36,6 +36,12 @@ jobs:
         run: |
           node node_modules/electron/install.js
           if (-not (Test-Path '.\\node_modules\\electron\\dist\\electron.exe')) { throw 'Electron runtime binary missing after installation' }
+      - name: Validate Electron JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check electron/main.cjs
+          node --check electron/preload.cjs
+          node --check electron/local-db.cjs
       - name: Build web bundle
         run: bun run build
       - name: Rebuild native Electron dependencies
