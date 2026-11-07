@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { isDesktop } from "@/lib/desktop-pos";
 import { formatCurrency } from "@/lib/format";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { exportPosExcel, printPosDay, type PosExportData } from "@/lib/pos-day-exports";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Day = { id: string; business_date: string; status: string };
@@ -56,6 +58,39 @@ export function PosDayReconciliation() {
       return data as Movements;
     },
   });
+  const exportData = (): PosExportData => {
+    if (!report.data || !movements.data) throw new Error("Wait for both reconciliation reports before exporting.");
+    const a = report.data, m = movements.data;
+    return {
+      businessDate: a.business_date, status: a.status,
+      rows: [
+        ["Opening cash", Number(a.opening_cash)],
+        ["Active POS invoices", Number(a.sale_count)],
+        ["POS sales", Number(a.net_sales)],
+        ["Total receipts", Number(a.total_received)],
+        ["Outstanding", Number(a.outstanding)],
+        ["Cash receipts (selected vault)", Number(a.cash_received_in_day_vault)],
+        ["Digital/other receipts (selected vault)", Number(a.digital_and_other_received_in_day_vault)],
+        ["Other vault receipts", Number(a.other_vault_receipts)],
+        ...Object.entries(a.payment_methods || {}).map(([key,value]): [string,number] => ["Payment: " + key, Number(value)]),
+        ["Expenses (date/vault)", Number(m.expenses)],
+        ["Customer refunds (date/vault)", Number(m.customer_refunds)],
+        ["Supplier refunds (date/vault)", Number(m.supplier_refunds)],
+        ["External topups (date/vault)", Number(m.external_topups)],
+        ["Transfers in (date/vault)", Number(m.transfers_in)],
+        ["Transfers out (date/vault)", Number(m.transfers_out)],
+        ["Provisional cash, excluding movements", Number(a.provisional_expected_cash)],
+      ],
+      disclaimer: "Provisional, read-only report. Cash vs noncash for movements is unknown; offline pending sales excluded. Not an authorized final closing.",
+    };
+  };
+  const runExport = (kind: "excel" | "pdf" | "thermal") => {
+    try {
+      const data = exportData();
+      if (kind === "excel") exportPosExcel(data);
+      else printPosDay(data, kind === "thermal");
+    } catch (e) { window.alert(e instanceof Error ? e.message : "Unable to export report"); }
+  };
   if (desktop) return <Card className="p-5">Online reconciliation is not available in offline desktop mode. Pending offline transactions are excluded.</Card>;
   return <Card className="space-y-4 p-5">
     <div>
@@ -71,6 +106,11 @@ export function PosDayReconciliation() {
       {report.isLoading ? <p>Calculating reconciliation...</p> : report.isError ?
         <p role="alert" className="text-destructive">Reconciliation unavailable: {(report.error as Error).message}. Apply the Task 3 migration before using this report.</p> :
         report.data && <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" disabled={!movements.data || movements.isError} onClick={() => runExport("thermal")}>Print 58 mm</Button>
+            <Button variant="outline" disabled={!movements.data || movements.isError} onClick={() => runExport("pdf")}>Print / Save PDF</Button>
+            <Button variant="outline" disabled={!movements.data || movements.isError} onClick={() => runExport("excel")}>Export Excel (.xls)</Button>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {([
               ["Opening cash", report.data.opening_cash],
