@@ -253,7 +253,7 @@ function NewSale() {
               <Label>Restaurant *</Label>
               <Select value={restaurantId} onValueChange={setRestaurantId}>
                 <SelectTrigger><SelectValue placeholder="Select restaurant" /></SelectTrigger>
-                <SelectContent>{(restaurants ?? []).map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{(restaurants ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Sale Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>

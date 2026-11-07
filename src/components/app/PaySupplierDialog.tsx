@@ -66,7 +66,7 @@ export function PaySupplierDialog({
   });
 
   const outstanding = useMemo(
-    () => (purchases ?? []).reduce((s, x: any) => s + purchaseBalance(x), 0),
+    () => (purchases ?? []).reduce((s: number, x: any) => s + purchaseBalance(x), 0),
     [purchases],
   );
   const unpaid = useMemo(

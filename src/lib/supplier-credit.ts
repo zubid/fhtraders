@@ -32,9 +32,9 @@ export async function paySupplier(opts: {
     p_amount: amount,
     p_method: method,
     p_payment_date: date,
-    p_note: note || null,
-    p_preferred_purchase_id: purchaseId ?? null,
-    p_vault_user_id: vaultUserId || null,
+    p_note: (note || null) as any,
+    p_preferred_purchase_id: (purchaseId ?? null) as any,
+    p_vault_user_id: (vaultUserId || null) as any,
   });
   if (error) throw error;
   return data;

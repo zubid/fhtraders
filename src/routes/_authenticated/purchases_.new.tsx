@@ -186,7 +186,7 @@ function NewPurchase() {
               <Label>Supplier *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
                 <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
-                <SelectContent>{(suppliers ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{(suppliers ?? []).map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
               {!supplierId && <Input placeholder="or type a new supplier name" value={newSupplier} onChange={(e) => setNewSupplier(e.target.value)} />}
             </div>

@@ -8,3 +8,4 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+- Unreviewed production DB changes go in `db/pending-migrations/` (never auto-applied); move them into the migration tool only after staging verification. Why: the user forbids live migrations before review.
