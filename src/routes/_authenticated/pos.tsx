@@ -78,7 +78,7 @@ function PosPage() {
     },
     refetchInterval: 15000,
   });
-  const pakistanToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const pakistanToday = () => { const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Karachi", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date()); const part = (type: string) => parts.find((p) => p.type === type)?.value ?? ""; return `${part("year")}-${part("month")}-${part("day")}`; };
   const dayReady = !isDesktop() && !dayStatus.isPending && !dayStatus.isError &&
     !!dayStatus.data && dayStatus.data.business_date === pakistanToday();
 
