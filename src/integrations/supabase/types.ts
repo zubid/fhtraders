@@ -399,6 +399,143 @@ export type Database = {
           },
         ]
       }
+      pos_business_days: {
+        Row: {
+          business_date: string
+          cash_difference: number | null
+          closed_at: string | null
+          closed_by: string | null
+          closing_attempt_id: string | null
+          closing_note: string | null
+          closing_reason: string | null
+          closing_snapshot: Json | null
+          counted_cash: number | null
+          expected_cash: number | null
+          expected_cash_status: string | null
+          id: string
+          opened_at: string
+          opened_by: string
+          opening_cash: number
+          opening_note: string | null
+          status: string
+          vault_user_id: string
+        }
+        Insert: {
+          business_date: string
+          cash_difference?: number | null
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_attempt_id?: string | null
+          closing_note?: string | null
+          closing_reason?: string | null
+          closing_snapshot?: Json | null
+          counted_cash?: number | null
+          expected_cash?: number | null
+          expected_cash_status?: string | null
+          id?: string
+          opened_at?: string
+          opened_by: string
+          opening_cash: number
+          opening_note?: string | null
+          status?: string
+          vault_user_id: string
+        }
+        Update: {
+          business_date?: string
+          cash_difference?: number | null
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_attempt_id?: string | null
+          closing_note?: string | null
+          closing_reason?: string | null
+          closing_snapshot?: Json | null
+          counted_cash?: number | null
+          expected_cash?: number | null
+          expected_cash_status?: string | null
+          id?: string
+          opened_at?: string
+          opened_by?: string
+          opening_cash?: number
+          opening_note?: string | null
+          status?: string
+          vault_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_business_days_closing_attempt_id_fkey"
+            columns: ["closing_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "pos_day_closing_attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_business_days_vault_user_id_fkey"
+            columns: ["vault_user_id"]
+            isOneToOne: false
+            referencedRelation: "vault_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pos_day_closing_attempts: {
+        Row: {
+          attempted_at: string
+          attempted_by: string
+          cash_difference: number | null
+          closing_note: string | null
+          counted_cash: number
+          expected_cash: number | null
+          expected_cash_status: string | null
+          id: string
+          movement_attestation: Json | null
+          offline_attestation: Json | null
+          pos_business_day_id: string
+          reason: string | null
+          snapshot: Json | null
+          status: string
+        }
+        Insert: {
+          attempted_at?: string
+          attempted_by: string
+          cash_difference?: number | null
+          closing_note?: string | null
+          counted_cash: number
+          expected_cash?: number | null
+          expected_cash_status?: string | null
+          id?: string
+          movement_attestation?: Json | null
+          offline_attestation?: Json | null
+          pos_business_day_id: string
+          reason?: string | null
+          snapshot?: Json | null
+          status?: string
+        }
+        Update: {
+          attempted_at?: string
+          attempted_by?: string
+          cash_difference?: number | null
+          closing_note?: string | null
+          counted_cash?: number
+          expected_cash?: number | null
+          expected_cash_status?: string | null
+          id?: string
+          movement_attestation?: Json | null
+          offline_attestation?: Json | null
+          pos_business_day_id?: string
+          reason?: string | null
+          snapshot?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_day_closing_attempts_pos_business_day_id_fkey"
+            columns: ["pos_business_day_id"]
+            isOneToOne: false
+            referencedRelation: "pos_business_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           avg_cost: number
@@ -679,6 +816,7 @@ export type Database = {
           notes: string | null
           payment_method: string | null
           payment_status: string
+          pos_business_day_id: string | null
           restaurant_id: string | null
           sale_date: string
           source: string
@@ -702,6 +840,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           payment_status?: string
+          pos_business_day_id?: string | null
           restaurant_id?: string | null
           sale_date?: string
           source?: string
@@ -725,6 +864,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           payment_status?: string
+          pos_business_day_id?: string | null
           restaurant_id?: string | null
           sale_date?: string
           source?: string
@@ -736,6 +876,13 @@ export type Database = {
           voided_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_pos_business_day_id_fkey"
+            columns: ["pos_business_day_id"]
+            isOneToOne: false
+            referencedRelation: "pos_business_days"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_restaurant_id_fkey"
             columns: ["restaurant_id"]
@@ -1317,10 +1464,37 @@ export type Database = {
         }
         Returns: Json
       }
+      create_pos_sale_core: {
+        Args: {
+          p_customer_name: string
+          p_discount: number
+          p_items: Json
+          p_method: string
+          p_note: string
+          p_vault_user_id: string
+        }
+        Returns: Json
+      }
+      finalize_pos_day_closing: {
+        Args: {
+          p_confirm: boolean
+          p_counted_cash: number
+          p_day_id: string
+          p_movement_attestation: Json
+          p_offline_attestation: Json
+          p_password: string
+          p_reason: string
+        }
+        Returns: Json
+      }
       finish_sync_operation: {
         Args: { p_error?: string; p_operation_id: string; p_success: boolean }
         Returns: undefined
       }
+      get_pos_closing_history: { Args: { p_limit?: number }; Returns: Json }
+      get_pos_day_close_preflight: { Args: { p_day_id: string }; Returns: Json }
+      get_pos_day_movements: { Args: { p_day_id: string }; Returns: Json }
+      get_pos_day_reconciliation: { Args: { p_day_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1334,6 +1508,14 @@ export type Database = {
           id: string
           name: string
         }[]
+      }
+      open_pos_business_day: {
+        Args: {
+          p_note?: string
+          p_opening_cash: number
+          p_vault_user_id: string
+        }
+        Returns: string
       }
       pos_edit_sale: {
         Args: {
@@ -1353,6 +1535,15 @@ export type Database = {
           p_quantity: number
           p_reason: string
           p_sale_id: string
+        }
+        Returns: Json
+      }
+      prepare_pos_day_closing: {
+        Args: {
+          p_counted_cash: number
+          p_day_id: string
+          p_note?: string
+          p_password: string
         }
         Returns: Json
       }
@@ -1465,20 +1656,36 @@ export type Database = {
         }
         Returns: Json
       }
-      sync_pos_sale: {
-        Args: {
-          p_customer_name: string
-          p_device_id: string
-          p_discount: number
-          p_items: Json
-          p_local_sale_id: string
-          p_method: string
-          p_note: string
-          p_operation_id: string
-          p_vault_user_id: string
-        }
-        Returns: Json
-      }
+      sync_pos_sale:
+        | {
+            Args: {
+              p_customer_name: string
+              p_device_id: string
+              p_discount: number
+              p_items: Json
+              p_local_sale_id: string
+              p_method: string
+              p_note: string
+              p_operation_id: string
+              p_vault_user_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_customer_name: string
+              p_device_id: string
+              p_discount: number
+              p_items: Json
+              p_local_sale_id: string
+              p_method: string
+              p_note: string
+              p_occurred_at: string
+              p_operation_id: string
+              p_vault_user_id: string
+            }
+            Returns: Json
+          }
       sync_purchase: {
         Args: {
           p_device_id: string
