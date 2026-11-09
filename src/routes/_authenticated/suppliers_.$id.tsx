@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { PaymentStatusBadge } from "@/components/app/PaymentStatusBadge";
 import { PaySupplierDialog } from "@/components/app/PaySupplierDialog";
 import { purchaseBalance, METHOD_LABELS } from "@/lib/supplier-credit";
+import { buildSupplierLedger, supplierStatementPeriod } from "@/lib/supplier-ledger";
 import { formatCurrency, formatDate, downloadCSV } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ function SupplierProfile() {
     },
   });
 
-  const { data: purchases } = useQuery({
+  const { data: purchases, isLoading: purchasesLoading, error: purchasesError } = useQuery({
     queryKey: ["supplier-purchases", id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -61,7 +62,7 @@ function SupplierProfile() {
     },
   });
 
-  const { data: payments } = useQuery({
+  const { data: payments, isLoading: paymentsLoading, error: paymentsError } = useQuery({
   queryKey: ["supplier-payments-list", id],
   queryFn: async () => {
     const { data, error } = await (supabase.from("supplier_payments" as any) as any)
@@ -75,10 +76,13 @@ function SupplierProfile() {
 });
 
 
-  const lifetime = (purchases ?? []).reduce((s, x: any) => s + Number(x.grand_total), 0);
-  const paid = (purchases ?? []).reduce((s, x: any) => s + Number(x.amount_paid), 0);
-  const outstanding = Math.max(0, lifetime - paid);
+  const statement = useMemo(() => buildSupplierLedger(purchases ?? [], payments ?? []), [purchases, payments]);
+  const period = useMemo(() => supplierStatementPeriod(statement.rows, from, to), [statement, from, to]);
+  const lifetime = statement.totalPurchases;
+  const paid = statement.totalPayments;
+  const outstanding = statement.expectedBalance;
   const orders = purchases?.length ?? 0;
+  const statementReady = !purchasesLoading && !paymentsLoading && !purchasesError && !paymentsError;
 
   const filtered = useMemo(() => {
     let rows = purchases ?? [];
@@ -91,34 +95,23 @@ function SupplierProfile() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagePurchases = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
-  const ledger = useMemo(() => {
-    const pAsc = [...(purchases ?? [])].sort((a: any, b: any) => a.purchase_date.localeCompare(b.purchase_date));
-    let cumPaid = 0;
-    const rows = (payments ?? []).map((p: any) => {
-      cumPaid += Number(p.amount);
-      const purToDate = pAsc
-        .filter((s: any) => s.purchase_date <= p.payment_date)
-        .reduce((sum, s: any) => sum + Number(s.grand_total), 0);
-      return { ...p, running: Math.max(0, purToDate - cumPaid) };
-    });
-    return rows.reverse();
-  }, [purchases, payments]);
-
   const exportStatement = () => {
+    if (!statementReady || statement.discrepancy !== 0) return;
     const rows: (string | number)[][] = [
-      ["Supplier Statement", supplier?.name ?? ""],
+      ["FH Traders — Supplier Statement"],
+      ["Supplier", supplier?.name ?? ""],
+      ["From", from || "Beginning"], ["To", to || "Latest"],
+      ["Opening Payable", period.opening.toFixed(2)],
       [],
-      ["Type", "Reference", "Date", "Credit (Purchase)", "Debit (Payment)"],
+      ["Date", "Type", "Reference", "Purchase (Debit)", "Payment (Credit)", "Running Payable", "Note"],
+      ...period.rows.map(e => [e.date, e.type, e.reference, e.debit || "", e.credit || "", e.balance.toFixed(2), e.note]),
+      [],
+      ["Total Purchases", period.purchases.toFixed(2)],
+      ["Total Payments", period.payments.toFixed(2)],
+      ["Closing Payable", period.closing.toFixed(2)],
+      ["Historical payments included", statement.historicalPayments.toFixed(2)],
     ];
-    const events = [
-      ...(purchases ?? []).map((s: any) => ({ date: s.purchase_date, type: "Purchase", ref: s.reference_no, credit: Number(s.grand_total), debit: 0 })),
-      ...(payments ?? []).map((p: any) => ({ date: p.payment_date, type: "Payment", ref: p.purchases?.reference_no ?? "General", credit: 0, debit: Number(p.amount) })),
-    ].sort((a, b) => a.date.localeCompare(b.date));
-    let bal = 0;
-    events.forEach((e) => { bal += e.credit - e.debit; rows.push([e.type, e.ref, e.date, e.credit || "", e.debit || ""]); });
-    rows.push([]);
-    rows.push(["", "", "Payable Balance", "", bal.toFixed(2)]);
-    downloadCSV(`supplier-${supplier?.name ?? "account"}.csv`, rows);
+    downloadCSV(`supplier-statement-${id}-${from || "all"}-${to || "latest"}.csv`, rows);
   };
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
@@ -132,7 +125,7 @@ function SupplierProfile() {
         description="Supplier account"
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={exportStatement}><Download className="mr-1 h-4 w-4" />Statement (CSV)</Button>
+            <Button variant="outline" onClick={exportStatement} disabled={!statementReady || Math.abs(statement.discrepancy) > 0.009}><Download className="mr-1 h-4 w-4" />Statement (CSV)</Button>
             <Button onClick={() => setPayOpen(true)}><HandCoins className="mr-1 h-4 w-4" />Pay Supplier</Button>
           </div>
         }
@@ -150,6 +143,7 @@ function SupplierProfile() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="purchases">Purchases</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger & Statement</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -226,7 +220,7 @@ function SupplierProfile() {
         <TabsContent value="payments">
           <Card>
             <CardContent className="pt-6">
-              {ledger.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No payments recorded.</p> : (
+              {(payments ?? []).length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">No payments recorded.</p> : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader><TableRow>
@@ -234,13 +228,13 @@ function SupplierProfile() {
                       <TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Balance After</TableHead><TableHead>Note</TableHead>
                     </TableRow></TableHeader>
                     <TableBody>
-                      {ledger.map((p: any) => (
+                      {(payments ?? []).map((p: any) => (
                         <TableRow key={p.id}>
                           <TableCell>{formatDate(p.payment_date)}</TableCell>
                           <TableCell className="font-mono text-xs">{p.purchases?.reference_no ?? "General"}</TableCell>
                           <TableCell>{METHOD_LABELS[p.method] ?? p.method}</TableCell>
                           <TableCell className="text-right font-medium text-success">{formatCurrency(p.amount)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(p.running)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(statement.rows.find(e => e.id === "payment-" + p.id)?.balance ?? 0)}</TableCell>
                           <TableCell className="text-muted-foreground">
                             {p.note ?? "-"}
                           </TableCell>
@@ -250,6 +244,40 @@ function SupplierProfile() {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="ledger">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Supplier Ledger & Statement</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div><label className="text-xs text-muted-foreground">From</label><Input type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
+                <div><label className="text-xs text-muted-foreground">To</label><Input type="date" value={to} onChange={e => setTo(e.target.value)} /></div>
+                <Button variant="outline" onClick={() => { setFrom(""); setTo(""); }}>All dates</Button>
+                <Button disabled={!statementReady || !!(from && to && from > to) || Math.abs(statement.discrepancy) > 0.009} onClick={exportStatement}><Download className="mr-1 h-4 w-4" />Download Statement (CSV)</Button>
+              </div>
+              {!statementReady ? <p className="text-sm text-destructive">{purchasesError || paymentsError ? "Unable to load complete ledger. Statement disabled." : "Loading complete ledger..."}</p> : null}
+              {Math.abs(statement.discrepancy) > 0.009 && <p className="rounded border border-destructive p-3 text-sm text-destructive">Reconciliation difference {formatCurrency(statement.discrepancy)}. Please review purchase/payment history before exporting. No balances have been modified.</p>}
+              {statement.historicalPayments > 0 && <p className="rounded border p-3 text-sm text-muted-foreground">Historical payments of {formatCurrency(statement.historicalPayments)} have no individually dated payment records. They are displayed separately at purchase date for reconciliation.</p>}
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div><p className="text-xs text-muted-foreground">Opening</p><p className="font-semibold">{formatCurrency(period.opening)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Purchases</p><p className="font-semibold">{formatCurrency(period.purchases)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Payments</p><p className="font-semibold">{formatCurrency(period.payments)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Closing Payable</p><p className="font-semibold">{formatCurrency(period.closing)}</p></div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Reference</TableHead><TableHead className="text-right">Purchase</TableHead><TableHead className="text-right">Payment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
+                  <TableBody>{period.rows.map(e => <TableRow key={e.id}>
+                    <TableCell>{formatDate(e.date)}</TableCell><TableCell>{e.type}</TableCell><TableCell className="font-mono text-xs">{e.reference}</TableCell>
+                    <TableCell className="text-right">{e.debit ? formatCurrency(e.debit) : "—"}</TableCell>
+                    <TableCell className="text-right">{e.credit ? formatCurrency(e.credit) : "—"}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(e.balance)}</TableCell><TableCell className="text-xs text-muted-foreground">{e.note || "—"}</TableCell>
+                  </TableRow>)}</TableBody>
+                </Table>
+              </div>
+              {statementReady && period.rows.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">No transactions for this period.</p>}
             </CardContent>
           </Card>
         </TabsContent>
