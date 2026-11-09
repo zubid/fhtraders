@@ -69,25 +69,20 @@ jobs:
         run: |
           $env:ELECTRON_RUN_AS_NODE = "1"
           & ".\\node_modules\\electron\\dist\\electron.exe" "scripts/offline-smoke.cjs"
-      - name: Build Windows installer (retry transient upstream download failures)
+      # Package the executable directory without NSIS. The NSIS/7zip upstream
+      # asset endpoints repeatedly return HTTP 504 even after five retries.
+      - name: Package Windows desktop without NSIS dependency
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $maxAttempts = 5
+          $maxAttempts = 4
           for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-            Write-Host "Electron Builder attempt $attempt of $maxAttempts"
-            & bunx electron-builder --win --publish never
+            Write-Host "Electron directory packaging attempt $attempt of $maxAttempts"
+            & bunx electron-builder --win --dir --publish never
             $code = $LASTEXITCODE
-            if ($code -eq 0) {
-              $installers = @(Get-ChildItem -Path release -Filter '*.exe' -File -ErrorAction SilentlyContinue)
-              if ($installers.Count -eq 0) { throw 'Electron Builder exited successfully but produced no installer' }
-              Write-Host "Installer produced: $($installers[0].FullName)"
-              break
-            }
-            if ($attempt -eq $maxAttempts) { throw "Windows installer packaging failed after $maxAttempts attempts (exit code $code)" }
-            $delay = 20 * $attempt
-            Write-Warning "Packaging failed (exit code $code). Waiting $delay seconds before retry; cached downloads will be reused."
-            Start-Sleep -Seconds $delay
+            if ($code -eq 0 -and (Test-Path 'release/win-unpacked/FH Traders.exe')) { break }
+            if ($attempt -eq $maxAttempts) { throw "Windows directory packaging failed after $maxAttempts attempts (exit code $code)" }
+            Start-Sleep -Seconds (15 * $attempt)
           }
       - name: Inspect packaged server files and launch diagnostics
         shell: pwsh
@@ -134,24 +129,31 @@ jobs:
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "FH Traders.exe" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
           }
-      - name: Upload Windows installer
+      - name: Create downloadable portable Windows desktop ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'release/win-unpacked/FH Traders.exe')) { throw 'Windows executable not found' }
+          Compress-Archive -Path 'release/win-unpacked/*' -DestinationPath 'release/FH-Traders-Windows-Portable.zip' -Force
+          if (-not (Test-Path 'release/FH-Traders-Windows-Portable.zip')) { throw 'Portable ZIP missing' }
+      - name: Upload Windows desktop package
         uses: actions/upload-artifact@v4
         with:
           name: fh-traders-windows
-          path: release/**
+          path: release/FH-Traders-Windows-Portable.zip
           if-no-files-found: error
-      - name: Publish latest Windows installer to public release
+      - name: Publish portable Windows desktop ZIP to public release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $files = @(Get-ChildItem -Path release -Filter *.exe -File)
-          if ($files.Count -eq 0) { throw "Windows installer EXE not found" }
+          $file = 'release/FH-Traders-Windows-Portable.zip'
+          if (-not (Test-Path $file)) { throw 'Portable desktop ZIP not found' }
           gh release view desktop-latest --repo "$env:GITHUB_REPOSITORY" 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create desktop-latest --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "FH Traders Desktop - Latest Windows Installer" --notes "Latest successfully built Windows desktop installer. Verify offline sync before live transactions." --latest
-            if ($LASTEXITCODE -ne 0) { throw "Could not create desktop release" }
+            gh release create desktop-latest --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "FH Traders Desktop - Latest Windows Package" --notes "Portable Windows package. Extract all files, then run FH Traders.exe. Verify offline sync before live transactions." --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create desktop release' }
           }
-          gh release upload desktop-latest $files.FullName --repo "$env:GITHUB_REPOSITORY" --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Could not upload desktop installer" }
+          gh release upload desktop-latest $file --repo "$env:GITHUB_REPOSITORY" --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload desktop package' }
