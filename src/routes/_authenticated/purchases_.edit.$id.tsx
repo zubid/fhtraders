@@ -36,6 +36,9 @@ function EditPurchase() {
   const [notes, setNotes] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [correctionPayment, setCorrectionPayment] = useState<any | null>(null);
+  const [reversePayment, setReversePayment] = useState<any | null>(null);
+  const [reverseVaultId, setReverseVaultId] = useState("");
+  const [reverseReason, setReverseReason] = useState("");
   const [newVaultId, setNewVaultId] = useState("");
   const [correctionReason, setCorrectionReason] = useState("");
   const [initialPaymentWarning, setInitialPaymentWarning] = useState(false);
@@ -107,6 +110,26 @@ function EditPurchase() {
         qc.invalidateQueries({ queryKey: ["supplier"] }),
       ]);
       toast.success("Payment Vault corrected");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const reverseInvoicePayment = useMutation({
+    mutationFn: async () => {
+      if (!isAdmin || !reversePayment || !reverseVaultId || reverseReason.trim().length < 8)
+        throw new Error("Choose a destination Vault and provide a reason of at least 8 characters.");
+      if (isDirty) throw new Error("Save or discard unsaved invoice changes first.");
+      const { error } = await (supabase.rpc as any)("reverse_supplier_invoice_payment", {
+        p_supplier_payment_id: reversePayment.id,
+        p_destination_vault_user_id: reverseVaultId,
+        p_reason: reverseReason.trim(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setReversePayment(null); setReverseVaultId(""); setReverseReason("");
+      await qc.invalidateQueries();
+      toast.success("Payment removed; invoice due and Vault balances recalculated. Audit retained.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -297,7 +320,7 @@ function EditPurchase() {
                       })()}
                     </TableCell>
                     <TableCell>{payment.note || "—"}</TableCell>
-                    {isAdmin && <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setCorrectionPayment(payment); setNewVaultId(""); setCorrectionReason(""); }}>Correct Vault</Button></TableCell>}
+                    {isAdmin && <TableCell className="text-right"><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => { setCorrectionPayment(payment); setNewVaultId(""); setCorrectionReason(""); }}>Correct Vault</Button><Button variant="destructive" size="sm" disabled={isDirty} onClick={() => { setReversePayment(payment); setReverseVaultId(payment.vault_user_id ?? ""); setReverseReason(""); }}>Reverse / Delete</Button></div></TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -315,6 +338,41 @@ function EditPurchase() {
           lockTarget
         />
       )}
+      <Dialog open={!!reversePayment} onOpenChange={(open) => { if (!open && !reverseInvoicePayment.isPending) setReversePayment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reverse and delete supplier payment</DialogTitle>
+            <DialogDescription>Removes this payment from the active invoice ledger, increases the invoice due, and credits your selected Business Cash Vault. Stock is unchanged. A permanent administrator audit record is retained. This corrects an erroneous entry; it does not record an actual cash refund from the supplier.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 rounded-md border p-3 text-sm">
+              <span className="text-muted-foreground">Invoice</span><strong>{purchase?.reference_no ?? "—"}</strong>
+              <span className="text-muted-foreground">Payment</span><strong>{formatCurrency(Number(reversePayment?.amount ?? 0))}</strong>
+              <span className="text-muted-foreground">Date</span><strong>{reversePayment ? formatDate(reversePayment.payment_date) : "—"}</strong>
+              <span className="text-muted-foreground">Original Vault</span><strong>{reversePayment?.vault_users?.name ?? "—"}</strong>
+            </div>
+            <div className="space-y-2">
+              <Label>Credit to Business Cash Vault *</Label>
+              <Select value={reverseVaultId} onValueChange={setReverseVaultId}>
+                <SelectTrigger><SelectValue placeholder="Choose Cash User or Profit/Rotator" /></SelectTrigger>
+                <SelectContent>{(correctionVaults ?? []).map((vault) => <SelectItem key={vault.id} value={vault.id}>{vault.name}</SelectItem>)}</SelectContent>
+              </Select>
+              {reverseVaultId && reverseVaultId !== reversePayment?.vault_user_id && <p className="text-xs text-muted-foreground">A separate internal transfer will route the reversal credit from the original Vault to the selected Vault.</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Reason *</Label>
+              <Textarea value={reverseReason} onChange={(e) => setReverseReason(e.target.value)} placeholder="Example: Duplicate payment entered against this invoice" />
+            </div>
+            <p className="text-sm text-destructive">The payment is deleted from active history. Its correction audit remains available to administrators.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReversePayment(null)} disabled={reverseInvoicePayment.isPending}>Cancel</Button>
+            <Button variant="destructive" disabled={reverseInvoicePayment.isPending || !reverseVaultId || reverseReason.trim().length < 8} onClick={() => reverseInvoicePayment.mutate()}>
+              {reverseInvoicePayment.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirm reversal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!correctionPayment} onOpenChange={(open) => { if (!open && !correctVault.isPending) setCorrectionPayment(null); }}>
         <DialogContent>
           <DialogHeader>
